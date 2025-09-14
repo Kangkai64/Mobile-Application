@@ -4,8 +4,13 @@ import 'screens/active_jobs_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/job_details_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  await Supabase.initialize(
+      url: 'https://dzajfltnnwjaoalaimob.supabase.co',
+      anonKey: 'sb_secret_V-wmePWdJH9SggsJXDvZxg_d-rttjIG'
+  );
   runApp(const MyApp());
 }
 

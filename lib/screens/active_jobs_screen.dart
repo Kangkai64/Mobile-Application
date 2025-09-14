@@ -155,7 +155,7 @@ class ActiveJobsScreen extends StatelessWidget {
     String title,
     String description,
     String vehicle,
-    String license,
+    String licensePlate,
     String assignedTo,
     String timeSpent,
   ) {
@@ -175,7 +175,7 @@ class ActiveJobsScreen extends StatelessWidget {
               title: title,
               description: description,
               vehicle: vehicle,
-              license: license,
+              licensePlate: licensePlate,
               assignedTo: assignedTo,
             ),
           ),
@@ -267,7 +267,7 @@ class ActiveJobsScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  license,
+                  licensePlate,
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
@@ -281,7 +281,10 @@ class ActiveJobsScreen extends StatelessWidget {
                   'Assigned to: $assignedTo',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
-                const Spacer(),
+              ],
+            ),
+            Row(
+              children: [
                 Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 Text(

@@ -22,10 +22,7 @@ class DashboardScreen extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
-            child: Icon(
-              Icons.calendar_today,
-              color: Colors.grey[600],
-            ),
+            child: Icon(Icons.calendar_today, color: Colors.green),
           ),
         ],
       ),
@@ -43,34 +40,20 @@ class DashboardScreen extends StatelessWidget {
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 24),
-            
+            const SizedBox(height: 12),
+
             // Job summary cards
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: _buildSummaryCard('Total Jobs', '2', Colors.blue),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSummaryCard('Today\'s Jobs', '0', Colors.orange),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSummaryCard('In Progress', '1', Colors.green),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSummaryCard('Completed', '0', Colors.purple),
-                ),
+                _buildSummaryBox('2', 'Total Jobs'),
+                _buildSummaryBox('0', "Today's Jobs"),
+                _buildSummaryBox('1', 'In Progress'),
+                _buildSummaryBox('0', 'Completed'),
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Filter tabs
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -87,7 +70,7 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Job list
             _buildJobCard(
               context,
@@ -120,40 +103,69 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, Color color) {
+  // Widget _buildSummaryCard(String title, String value, Color color) {
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(12),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.grey.withOpacity(0.1),
+  //           spreadRadius: 1,
+  //           blurRadius: 4,
+  //           offset: const Offset(0, 2),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           title,
+  //           style: TextStyle(
+  //             color: Colors.grey[600],
+  //             fontSize: 14,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           value,
+  //           style: TextStyle(
+  //             color: color,
+  //             fontSize: 24,
+  //             fontWeight: FontWeight.bold,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _buildSummaryBox(String count, String label) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: 85,
+      height: 70,
+      padding: EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withAlpha(150),
+            blurRadius: 5,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
+            count,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),
     );
@@ -187,14 +199,20 @@ class DashboardScreen extends StatelessWidget {
     String title,
     String description,
     String vehicle,
-    String license,
+    String licensePlate,
     String assignedTo,
     String timeSpent,
   ) {
-    Color priorityColor = priority == 'HIGH' ? Colors.red : 
-                         priority == 'MEDIUM' ? Colors.orange : Colors.green;
-    Color statusColor = status == 'IN PROGRESS' ? Colors.green :
-                       status == 'PENDING' ? Colors.orange : Colors.blue;
+    Color priorityColor = priority == 'HIGH'
+        ? Colors.red
+        : priority == 'MEDIUM'
+        ? Colors.orange
+        : Colors.green;
+    Color statusColor = status == 'IN PROGRESS'
+        ? Colors.green
+        : status == 'PENDING'
+        ? Colors.orange
+        : Colors.blue;
 
     return GestureDetector(
       onTap: () {
@@ -207,7 +225,7 @@ class DashboardScreen extends StatelessWidget {
               title: title,
               description: description,
               vehicle: vehicle,
-              license: license,
+              licensePlate: licensePlate,
               assignedTo: assignedTo,
             ),
           ),
@@ -244,7 +262,10 @@ class DashboardScreen extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: priorityColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -260,7 +281,10 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -279,6 +303,7 @@ class DashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            // Job title
             Text(
               title,
               style: const TextStyle(
@@ -288,28 +313,33 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
+            // Job description
             Text(
               description,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.directions_car, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  vehicle,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  license,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-              ],
+            // Vehicle details
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.directions_car, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    vehicle,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    licensePlate,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Row(
@@ -320,7 +350,10 @@ class DashboardScreen extends StatelessWidget {
                   'Assigned to: $assignedTo',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
-                const Spacer(),
+              ],
+            ),
+            Row(
+              children: [
                 Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 Text(

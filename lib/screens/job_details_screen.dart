@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'workload.dart';
 
-class JobDetailsScreen extends StatelessWidget {
+class JobDetailsScreen extends StatefulWidget {
   final String workOrder;
   final String status;
   final String title;
   final String description;
   final String vehicle;
-  final String license;
+  final String licensePlate;
   final String assignedTo;
 
   const JobDetailsScreen({
@@ -16,9 +18,70 @@ class JobDetailsScreen extends StatelessWidget {
     required this.title,
     required this.description,
     required this.vehicle,
-    required this.license,
+    required this.licensePlate,
     required this.assignedTo,
   });
+
+  @override
+  State<JobDetailsScreen> createState() => _JobDetailsScreenState();
+}
+
+class _JobDetailsScreenState extends State<JobDetailsScreen> {
+  late String currentStatus;
+  bool isUpdating = false;
+  final supabase = Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with passed status
+    currentStatus = "Pending";
+  }
+
+  Future<void> updateJobStatus(String newStatus) async {
+    setState(() {
+      isUpdating = true;
+    });
+
+    try {
+      final responese = await supabase
+          .from('WorkOrders')
+          .update({
+        'status' : newStatus,
+        'updated_at' : DateTime.now().toIso8601String(),
+      }).eq('id', widget.workOrder);
+
+      setState(() {
+        currentStatus = newStatus;
+        isUpdating = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Job status updated to $newStatus'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          )
+        );
+      }
+    }
+    catch (error) {
+      setState(() {
+        isUpdating = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status: ${error.toString()}'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            )
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +130,7 @@ class JobDetailsScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        workOrder,
+                        widget.workOrder,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -81,9 +144,9 @@ class JobDetailsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
-                          status,
-                          style: const TextStyle(
-                            color: Colors.green,
+                          currentStatus,
+                          style: TextStyle(
+                            color: _getStatusColor(currentStatus),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -93,7 +156,7 @@ class JobDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    title,
+                    widget.title,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -102,7 +165,7 @@ class JobDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    description,
+                    widget.description,
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 14,
@@ -140,7 +203,7 @@ class JobDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(Icons.person, assignedTo),
+                  _buildInfoRow(Icons.person, widget.assignedTo),
                   _buildInfoRow(Icons.phone, '(555) 123-4567'),
                   _buildInfoRow(Icons.email, 'john.smith@email.com'),
                   _buildInfoRow(Icons.location_on, '123 Main St, City, State 12345'),
@@ -154,9 +217,21 @@ class JobDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(Icons.directions_car, vehicle),
-                  _buildInfoRow(Icons.confirmation_number, 'VIN: 1FTFW1ET5LFC12345'),
-                  _buildInfoRow(Icons.credit_card, 'License: $license'),
+                  Container(
+                    padding: EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoRow(Icons.directions_car, widget.vehicle),
+                        _buildInfoRow(Icons.confirmation_number, 'VIN: 1FTFW1ET5LFC12345'),
+                        _buildInfoRow(Icons.credit_card, 'License Plate: ${widget.licensePlate}'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -189,16 +264,44 @@ class JobDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+
+                  if (isUpdating)
+                    Center (
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 8,),
+                          Text('Updating status...', style: TextStyle(color: Colors.grey),)
+                        ],
+                      ),
+                    )
+                  else
+                  Column(
                     children: [
-                      _buildStatusButton('Pending', Colors.orange, status == 'PENDING'),
-                      _buildStatusButton('Accepted', Colors.blue, false),
-                      _buildStatusButton('In Progress', Colors.green, status == 'IN PROGRESS'),
-                      _buildStatusButton('On Hold', Colors.red, false),
-                      _buildStatusButton('Completed', Colors.purple, false),
-                      _buildStatusButton('Signed Off', Colors.grey, false),
+                      Row(
+                        children: [
+                          Expanded(child: _buildStatusButton('Pending', Colors.orange, currentStatus == 'Pending', () => updateJobStatus('Pending'))),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildStatusButton('Accepted', Colors.blue, currentStatus == 'Accepted', () => updateJobStatus('Accepted'))),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildStatusButton('In Progress', Colors.green, currentStatus == 'In Progress', () => updateJobStatus('In Progress'))),
+                          const SizedBox(width: 8)
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child:
+                          Row(
+                            children: [
+                              Expanded(child: _buildStatusButton('On Hold', Colors.red, currentStatus == 'On Hold', () => updateJobStatus('On Hold'))),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildStatusButton('Completed', Colors.purple, currentStatus == 'Completed', () => updateJobStatus('Completed'))),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildStatusButton('Signed Off', Colors.grey, currentStatus == 'Signed Off', () => updateJobStatus('Signed Off'))),
+                              const SizedBox(width: 8)
+                            ],
+                          ),
+                      ),
                     ],
                   ),
                 ],
@@ -293,25 +396,48 @@ class JobDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusButton(String text, Color color, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? color : Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? color : color.withOpacity(0.5),
-          width: 1.5,
+  Widget _buildStatusButton(String text, Color color, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.5),
+            width: 1.5,
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.white : color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSelected ? Colors.white : color,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Pending':
+        return Colors.orange;
+      case 'Accepted':
+        return Colors.blue;
+      case 'In Progress':
+        return Colors.green;
+      case 'On Hold':
+        return Colors.red;
+      case 'Completed':
+        return Colors.purple;
+      case 'Signed Off':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
   }
 }
