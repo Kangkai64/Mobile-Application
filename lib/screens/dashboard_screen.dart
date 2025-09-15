@@ -12,12 +12,15 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  String? _selectedStatus; // null => All Jobs
   @override
   Widget build(BuildContext context) {
     final workOrdersProvider = context.watch<WorkOrdersProvider>();
-    final List<WorkOrders> orders = workOrdersProvider.filterOrders();
+    final List<WorkOrders> allOrders = workOrdersProvider.workOrders ?? [];
+    final List<WorkOrders> orders =
+        workOrdersProvider.filterOrders(status: _selectedStatus);
 
-    int countByStatus(String status) => orders
+    int countByStatus(String status) => allOrders
         .where((o) => (o.status).toUpperCase() == status.toUpperCase())
         .length;
 
@@ -25,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       DateTime now = DateTime.now();
       bool isSameDay(DateTime a, DateTime b) =>
           a.year == b.year && a.month == b.month && a.day == b.day;
-      return orders.where((o) => isSameDay(o.scheduledDate, now)).length;
+      return allOrders.where((o) => isSameDay(o.scheduledDate, now)).length;
     }
 
     return Scaffold(
@@ -84,21 +87,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterTab('All Jobs (${orders.length})', true),
+                  _buildFilterTab(
+                    'All Jobs (${allOrders.length})',
+                    _selectedStatus == null,
+                    () {
+                      setState(() => _selectedStatus = null);
+                    },
+                  ),
                   const SizedBox(width: 8),
                   _buildFilterTab(
                     'Pending (${countByStatus('PENDING')})',
-                    false,
+                    _selectedStatus?.toUpperCase() == 'PENDING',
+                    () {
+                      setState(() => _selectedStatus = 'PENDING');
+                    },
                   ),
                   const SizedBox(width: 8),
                   _buildFilterTab(
                     'In Progress (${countByStatus('IN PROGRESS')})',
-                    false,
+                    _selectedStatus?.toUpperCase() == 'IN PROGRESS',
+                    () {
+                      setState(() => _selectedStatus = 'IN PROGRESS');
+                    },
                   ),
                   const SizedBox(width: 8),
                   _buildFilterTab(
                     'Completed (${countByStatus('COMPLETED')})',
-                    false,
+                    _selectedStatus?.toUpperCase() == 'COMPLETED',
+                    () {
+                      setState(() => _selectedStatus = 'COMPLETED');
+                    },
                   ),
                 ],
               ),
@@ -163,21 +181,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildFilterTab(String text, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.green : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? Colors.green : Colors.grey[300]!,
+  Widget _buildFilterTab(String text, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.green : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.green : Colors.grey[300]!,
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey[600],
-          fontWeight: FontWeight.w500,
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
