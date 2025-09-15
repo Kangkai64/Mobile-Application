@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'job_details_screen.dart';
+import '../models/work_orders.dart';
+import 'package:provider/provider.dart';
+import '../providers/work_orders_provider.dart';
 
 class ActiveJobsScreen extends StatelessWidget {
   const ActiveJobsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<WorkOrdersProvider>();
+    final inProgress = provider.filterOrders(status: 'IN PROGRESS');
+    final pending = provider.filterOrders(status: 'PENDING');
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -27,7 +33,7 @@ class ActiveJobsScreen extends StatelessWidget {
                 Icon(Icons.access_time, color: Colors.green[600], size: 20),
                 const SizedBox(width: 4),
                 Text(
-                  '1 Active',
+                  '${inProgress.length} Active',
                   style: TextStyle(
                     color: Colors.green[600],
                     fontWeight: FontWeight.w600,
@@ -76,18 +82,24 @@ class ActiveJobsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildJobCard(
-                    context,
-                    'WO-2025-001',
-                    'MEDIUM',
-                    'IN PROGRESS',
-                    'Engine Oil Change & Inspection',
-                    'Regular maintenance oil change with multi-point inspection',
-                    '2020 Ford F-150',
-                    'ABC-123',
-                    'John Smith',
-                    '0h 30m',
-                  ),
+                  if (inProgress.isEmpty)
+                    Text('No in-progress jobs', style: TextStyle(color: Colors.grey[600]))
+                  else
+                    ...inProgress.map((o) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: _buildJobCard(
+                            context,
+                            o.id,
+                            o.priority.toUpperCase(),
+                            o.status,
+                            o.customerNotes.isNotEmpty ? o.customerNotes : 'Work Order',
+                            o.internalNotes,
+                            o.vehicleName,
+                            o.licensePlate,
+                            o.assignedStaffId,
+                            '',
+                          ),
+                        )),
                 ],
               ),
             ),
@@ -126,18 +138,24 @@ class ActiveJobsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildJobCard(
-                    context,
-                    'WO-2025-002',
-                    'HIGH',
-                    'PENDING',
-                    'Brake System Repair',
-                    'Replace brake pads and rotors, brake fluid flush',
-                    '2019 Toyota Camry',
-                    'XYZ-789',
-                    'Sarah Johnson',
-                    '0h 0m',
-                  ),
+                  if (pending.isEmpty)
+                    Text('No pending jobs', style: TextStyle(color: Colors.grey[600]))
+                  else
+                    ...pending.map((o) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: _buildJobCard(
+                            context,
+                            o.id,
+                            o.priority.toUpperCase(),
+                            o.status,
+                            o.customerNotes.isNotEmpty ? o.customerNotes : 'Work Order',
+                            o.internalNotes,
+                            o.vehicleName,
+                            o.licensePlate,
+                            o.assignedStaffId,
+                            '',
+                          ),
+                        )),
                 ],
               ),
             ),
@@ -161,8 +179,7 @@ class ActiveJobsScreen extends StatelessWidget {
   ) {
     Color priorityColor = priority == 'HIGH' ? Colors.red : 
                          priority == 'MEDIUM' ? Colors.orange : Colors.green;
-    Color statusColor = status == 'IN PROGRESS' ? Colors.green :
-                       status == 'PENDING' ? Colors.orange : Colors.blue;
+    Color statusColor = _statusColor(status);
 
     return GestureDetector(
       onTap: () {
@@ -177,6 +194,11 @@ class ActiveJobsScreen extends StatelessWidget {
               vehicle: vehicle,
               licensePlate: licensePlate,
               assignedTo: assignedTo,
+              customerName: '',
+              customerEmail: '',
+              customerPhone: '',
+              customerAddress: '',
+              vehicleVin: '',
             ),
           ),
         );
@@ -227,7 +249,7 @@ class ActiveJobsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        status,
+                        _statusDisplay(status),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: 12,
@@ -297,5 +319,49 @@ class ActiveJobsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.trim().toUpperCase()) {
+      case 'IN PROGRESS':
+      case 'IN_PROGRESS':
+        return Colors.green;
+      case 'PENDING':
+        return Colors.orange;
+      case 'ACCEPTED':
+        return Colors.blue;
+      case 'ON HOLD':
+      case 'ON_HOLD':
+        return Colors.red;
+      case 'COMPLETED':
+        return Colors.purple;
+      case 'SIGNED OFF':
+      case 'SIGNED_OFF':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _statusDisplay(String status) {
+    switch (status.trim().toUpperCase()) {
+      case 'IN PROGRESS':
+      case 'IN_PROGRESS':
+        return 'IN PROGRESS';
+      case 'PENDING':
+        return 'PENDING';
+      case 'ACCEPTED':
+        return 'ACCEPTED';
+      case 'ON HOLD':
+      case 'ON_HOLD':
+        return 'ON HOLD';
+      case 'COMPLETED':
+        return 'COMPLETED';
+      case 'SIGNED OFF':
+      case 'SIGNED_OFF':
+        return 'SIGNED OFF';
+      default:
+        return status.toUpperCase();
+    }
   }
 }

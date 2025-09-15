@@ -3,10 +3,13 @@ import 'screens/dashboard_screen.dart';
 import 'screens/active_jobs_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/job_details_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'providers/work_orders_provider.dart';
+
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
       url: 'https://dzajfltnnwjaoalaimob.supabase.co',
       anonKey: 'sb_secret_V-wmePWdJH9SggsJXDvZxg_d-rttjIG'
@@ -14,18 +17,26 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Greenstem Workshop Management',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
+    return ChangeNotifierProvider<WorkOrdersProvider>(
+      create: (_) => WorkOrdersProvider()..loadWorkOrders(),
+      child: MaterialApp(
+        title: 'Greenstem Workshop Management',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+          useMaterial3: true,
+        ),
+        home: const MainScreen(),
       ),
-      home: const MainScreen(),
     );
   }
 }
@@ -40,15 +51,16 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const ActiveJobsScreen(),
-    const CameraScreen(),
-    const ProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+
+    final List<Widget> _screens = [
+      const DashboardScreen(),
+      const ActiveJobsScreen(),
+      const CameraScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(

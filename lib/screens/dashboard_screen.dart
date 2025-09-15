@@ -1,11 +1,33 @@
 import 'package:flutter/material.dart';
 import 'job_details_screen.dart';
+import '../models/work_orders.dart';
+import 'package:provider/provider.dart';
+import '../providers/work_orders_provider.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  @override
   Widget build(BuildContext context) {
+    final workOrdersProvider = context.watch<WorkOrdersProvider>();
+    final List<WorkOrders> orders = workOrdersProvider.filterOrders();
+
+    int countByStatus(String status) => orders
+        .where((o) => (o.status).toUpperCase() == status.toUpperCase())
+        .length;
+
+    int countToday() {
+      DateTime now = DateTime.now();
+      bool isSameDay(DateTime a, DateTime b) =>
+          a.year == b.year && a.month == b.month && a.day == b.day;
+      return orders.where((o) => isSameDay(o.scheduledDate, now)).length;
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -46,10 +68,13 @@ class DashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryBox('2', 'Total Jobs'),
-                _buildSummaryBox('0', "Today's Jobs"),
-                _buildSummaryBox('1', 'In Progress'),
-                _buildSummaryBox('0', 'Completed'),
+                _buildSummaryBox('${orders.length}', 'Total Jobs'),
+                _buildSummaryBox('${countToday()}', "Today's Jobs"),
+                _buildSummaryBox(
+                  '${countByStatus('IN PROGRESS')}',
+                  'In Progress',
+                ),
+                _buildSummaryBox('${countByStatus('COMPLETED')}', 'Completed'),
               ],
             ),
             const SizedBox(height: 24),
@@ -59,44 +84,49 @@ class DashboardScreen extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterTab('All Jobs (2)', true),
+                  _buildFilterTab('All Jobs (${orders.length})', true),
                   const SizedBox(width: 8),
-                  _buildFilterTab('Pending (1)', false),
+                  _buildFilterTab(
+                    'Pending (${countByStatus('PENDING')})',
+                    false,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('In Progress (1)', false),
+                  _buildFilterTab(
+                    'In Progress (${countByStatus('IN PROGRESS')})',
+                    false,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('Completed (0)', false),
+                  _buildFilterTab(
+                    'Completed (${countByStatus('COMPLETED')})',
+                    false,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
             // Job list
-            _buildJobCard(
-              context,
-              'WO-2025-001',
-              'MEDIUM',
-              'IN PROGRESS',
-              'Engine Oil Change & Inspection',
-              'Regular maintenance oil change with multi-point inspection',
-              '2020 Ford F-150',
-              'ABC-123',
-              'John Smith',
-              '0h 30m',
-            ),
-            const SizedBox(height: 12),
-            _buildJobCard(
-              context,
-              'WO-2025-002',
-              'HIGH',
-              'PENDING',
-              'Brake System Repair',
-              'Replace brake pads and rotors, brake fluid flush',
-              '2019 Toyota Camry',
-              'XYZ-789',
-              'Sarah Johnson',
-              '0h 0m',
-            ),
+            if (orders.isEmpty)
+              Center(
+                child: Column(
+                  children: const [
+                    SizedBox(height: 24),
+                    CircularProgressIndicator(),
+                    SizedBox(height: 8),
+                    Text('Loading work orders...'),
+                  ],
+                ),
+              )
+            else
+              ...orders.map(
+                (o) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: _buildJobCardWithOrder(
+                    context,
+                    o,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -104,44 +134,6 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // Widget _buildSummaryCard(String title, String value, Color color) {
-  //   return Container(
-  //     padding: const EdgeInsets.all(16),
-  //     decoration: BoxDecoration(
-  //       color: Colors.white,
-  //       borderRadius: BorderRadius.circular(12),
-  //       boxShadow: [
-  //         BoxShadow(
-  //           color: Colors.grey.withOpacity(0.1),
-  //           spreadRadius: 1,
-  //           blurRadius: 4,
-  //           offset: const Offset(0, 2),
-  //         ),
-  //       ],
-  //     ),
-  //     child: Column(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         Text(
-  //           title,
-  //           style: TextStyle(
-  //             color: Colors.grey[600],
-  //             fontSize: 14,
-  //           ),
-  //         ),
-  //         const SizedBox(height: 8),
-  //         Text(
-  //           value,
-  //           style: TextStyle(
-  //             color: color,
-  //             fontSize: 24,
-  //             fontWeight: FontWeight.bold,
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
   Widget _buildSummaryBox(String count, String label) {
     return Container(
       width: 85,
@@ -191,6 +183,26 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildJobCardWithOrder(BuildContext context, WorkOrders o) {
+    return _buildJobCard(
+      context,
+      o.id,
+      o.priority.toUpperCase(),
+      o.status,
+      o.customerNotes.isNotEmpty ? o.customerNotes : 'Work Order',
+      o.internalNotes,
+      o.vehicleName,
+      o.licensePlate,
+      o.assignedStaffId,
+      '',
+      customerName: o.customerName,
+      customerEmail: o.customerEmail,
+      customerPhone: o.customerPhone,
+      customerAddress: o.customerAddress,
+      vehicleVin: o.vehicles?.vin ?? '',
+    );
+  }
+
   Widget _buildJobCard(
     BuildContext context,
     String workOrder,
@@ -202,17 +214,14 @@ class DashboardScreen extends StatelessWidget {
     String licensePlate,
     String assignedTo,
     String timeSpent,
+    {String customerName = '', String customerEmail = '', String customerPhone = '', String customerAddress = '', String vehicleVin = ''}
   ) {
     Color priorityColor = priority == 'HIGH'
         ? Colors.red
         : priority == 'MEDIUM'
-        ? Colors.orange
-        : Colors.green;
-    Color statusColor = status == 'IN PROGRESS'
-        ? Colors.green
-        : status == 'PENDING'
-        ? Colors.orange
-        : Colors.blue;
+            ? Colors.orange
+            : Colors.green;
+    Color statusColor = _statusColor(status);
 
     return GestureDetector(
       onTap: () {
@@ -227,6 +236,11 @@ class DashboardScreen extends StatelessWidget {
               vehicle: vehicle,
               licensePlate: licensePlate,
               assignedTo: assignedTo,
+              customerName: customerName,
+              customerEmail: customerEmail,
+              customerPhone: customerPhone,
+              customerAddress: customerAddress,
+              vehicleVin: vehicleVin,
             ),
           ),
         );
@@ -290,7 +304,7 @@ class DashboardScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        status,
+                        _statusDisplay(status),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: 12,
@@ -366,5 +380,49 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.trim().toUpperCase()) {
+      case 'IN PROGRESS':
+      case 'IN_PROGRESS':
+        return Colors.green;
+      case 'PENDING':
+        return Colors.orange;
+      case 'ACCEPTED':
+        return Colors.blue;
+      case 'ON HOLD':
+      case 'ON_HOLD':
+        return Colors.red;
+      case 'COMPLETED':
+        return Colors.purple;
+      case 'SIGNED OFF':
+      case 'SIGNED_OFF':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _statusDisplay(String status) {
+    switch (status.trim().toUpperCase()) {
+      case 'IN PROGRESS':
+      case 'IN_PROGRESS':
+        return 'IN PROGRESS';
+      case 'PENDING':
+        return 'PENDING';
+      case 'ACCEPTED':
+        return 'ACCEPTED';
+      case 'ON HOLD':
+      case 'ON_HOLD':
+        return 'ON HOLD';
+      case 'COMPLETED':
+        return 'COMPLETED';
+      case 'SIGNED OFF':
+      case 'SIGNED_OFF':
+        return 'SIGNED OFF';
+      default:
+        return status.toUpperCase();
+    }
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'workload.dart';
+import 'package:provider/provider.dart';
+import '../providers/work_orders_provider.dart';
 
 class JobDetailsScreen extends StatefulWidget {
   final String workOrder;
@@ -10,6 +10,11 @@ class JobDetailsScreen extends StatefulWidget {
   final String vehicle;
   final String licensePlate;
   final String assignedTo;
+  final String customerName;
+  final String customerEmail;
+  final String customerPhone;
+  final String customerAddress;
+  final String vehicleVin;
 
   const JobDetailsScreen({
     super.key,
@@ -20,6 +25,11 @@ class JobDetailsScreen extends StatefulWidget {
     required this.vehicle,
     required this.licensePlate,
     required this.assignedTo,
+    required this.customerName,
+    required this.customerEmail,
+    required this.customerPhone,
+    required this.customerAddress,
+    required this.vehicleVin,
   });
 
   @override
@@ -27,15 +37,56 @@ class JobDetailsScreen extends StatefulWidget {
 }
 
 class _JobDetailsScreenState extends State<JobDetailsScreen> {
-  late String currentStatus;
+  late String currentStatusDisplay;
   bool isUpdating = false;
-  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with passed status
-    currentStatus = "Pending";
+    // Normalize incoming status (DB may pass uppercase)
+    currentStatusDisplay = _toDisplayStatus(widget.status);
+  }
+
+  // Helpers to normalize status text between UI and DB
+  String _toDisplayStatus(String raw) {
+    switch (raw.trim().toUpperCase()) {
+      case 'PENDING':
+        return 'Pending';
+      case 'ACCEPTED':
+        return 'Accepted';
+      case 'IN PROGRESS':
+      case 'IN_PROGRESS':
+        return 'In Progress';
+      case 'ON HOLD':
+      case 'ON_HOLD':
+        return 'On Hold';
+      case 'COMPLETED':
+        return 'Completed';
+      case 'SIGNED OFF':
+      case 'SIGNED_OFF':
+        return 'Signed Off';
+      default:
+        return raw;
+    }
+  }
+
+  String _toDbStatus(String display) {
+    switch (display) {
+      case 'Pending':
+        return 'PENDING';
+      case 'Accepted':
+        return 'ACCEPTED';
+      case 'In Progress':
+        return 'IN PROGRESS';
+      case 'On Hold':
+        return 'ON HOLD';
+      case 'Completed':
+        return 'COMPLETED';
+      case 'Signed Off':
+        return 'SIGNED OFF';
+      default:
+        return display.toUpperCase();
+    }
   }
 
   Future<void> updateJobStatus(String newStatus) async {
@@ -44,17 +95,32 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     });
 
     try {
-      final responese = await supabase
-          .from('WorkOrders')
-          .update({
-        'status' : newStatus,
-        'updated_at' : DateTime.now().toIso8601String(),
-      }).eq('id', widget.workOrder);
-
-      setState(() {
-        currentStatus = newStatus;
-        isUpdating = false;
+      final provider = context.read<WorkOrdersProvider>();
+      final success = await provider.updateWorkOrder(widget.workOrder, {
+        // DB has a CHECK constraint expecting title-cased values
+        'status': newStatus,
+        'updated_at': DateTime.now().toIso8601String(),
       });
+
+      if (success) {
+        setState(() {
+          currentStatusDisplay = newStatus;
+          isUpdating = false;
+        });
+      } else {
+        setState(() {
+          isUpdating = false;
+        });
+        if (mounted) {
+          final providerError = context.read<WorkOrdersProvider>().error;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Failed to update status${providerError != null ? ": $providerError" : ''}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ));
+        }
+        return;
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -144,9 +210,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
-                          currentStatus,
+                          currentStatusDisplay,
                           style: TextStyle(
-                            color: _getStatusColor(currentStatus),
+                            color: _getStatusColor(currentStatusDisplay),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -203,10 +269,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(Icons.person, widget.assignedTo),
-                  _buildInfoRow(Icons.phone, '(555) 123-4567'),
-                  _buildInfoRow(Icons.email, 'john.smith@email.com'),
-                  _buildInfoRow(Icons.location_on, '123 Main St, City, State 12345'),
+                  _buildInfoRow(Icons.person, widget.customerName.isNotEmpty ? widget.customerName : widget.assignedTo),
+                  if (widget.customerEmail.isNotEmpty)
+                    _buildInfoRow(Icons.email, widget.customerEmail),
+                  if (widget.customerPhone.isNotEmpty)
+                    _buildInfoRow(Icons.phone, widget.customerPhone),
+                  if (widget.customerAddress.isNotEmpty)
+                    _buildInfoRow(Icons.location_on, widget.customerAddress),
                   const SizedBox(height: 16),
                   const Text(
                     'Vehicle',
@@ -227,7 +296,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildInfoRow(Icons.directions_car, widget.vehicle),
-                        _buildInfoRow(Icons.confirmation_number, 'VIN: 1FTFW1ET5LFC12345'),
+                        _buildInfoRow(Icons.confirmation_number, 'VIN: ${widget.vehicleVin.isNotEmpty ? widget.vehicleVin : 'N/A'}'),
                         _buildInfoRow(Icons.credit_card, 'License Plate: ${widget.licensePlate}'),
                       ],
                     ),
@@ -280,11 +349,11 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     children: [
                       Row(
                         children: [
-                          Expanded(child: _buildStatusButton('Pending', Colors.orange, currentStatus == 'Pending', () => updateJobStatus('Pending'))),
+                          Expanded(child: _buildStatusButton('Pending', Colors.orange, currentStatusDisplay == 'Pending', () => updateJobStatus('Pending'))),
                           const SizedBox(width: 8),
-                          Expanded(child: _buildStatusButton('Accepted', Colors.blue, currentStatus == 'Accepted', () => updateJobStatus('Accepted'))),
+                          Expanded(child: _buildStatusButton('Accepted', Colors.blue, currentStatusDisplay == 'Accepted', () => updateJobStatus('Accepted'))),
                           const SizedBox(width: 8),
-                          Expanded(child: _buildStatusButton('In Progress', Colors.green, currentStatus == 'In Progress', () => updateJobStatus('In Progress'))),
+                          Expanded(child: _buildStatusButton('In Progress', Colors.green, currentStatusDisplay == 'In Progress', () => updateJobStatus('In Progress'))),
                           const SizedBox(width: 8)
                         ],
                       ),
@@ -293,11 +362,11 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                         child:
                           Row(
                             children: [
-                              Expanded(child: _buildStatusButton('On Hold', Colors.red, currentStatus == 'On Hold', () => updateJobStatus('On Hold'))),
+                              Expanded(child: _buildStatusButton('On Hold', Colors.red, currentStatusDisplay == 'On Hold', () => updateJobStatus('On Hold'))),
                               const SizedBox(width: 8),
-                              Expanded(child: _buildStatusButton('Completed', Colors.purple, currentStatus == 'Completed', () => updateJobStatus('Completed'))),
+                              Expanded(child: _buildStatusButton('Completed', Colors.purple, currentStatusDisplay == 'Completed', () => updateJobStatus('Completed'))),
                               const SizedBox(width: 8),
-                              Expanded(child: _buildStatusButton('Signed Off', Colors.grey, currentStatus == 'Signed Off', () => updateJobStatus('Signed Off'))),
+                              Expanded(child: _buildStatusButton('Signed Off', Colors.grey, currentStatusDisplay == 'Signed Off', () => updateJobStatus('Signed Off'))),
                               const SizedBox(width: 8)
                             ],
                           ),
