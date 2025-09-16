@@ -9,9 +9,10 @@ class Staff {
   final String position;
   final DateTime? hireDate;
   final double? salary;
-  final bool isActive;
+  final String staffStatus;
   final String? notes;
   final String? authUserId; // Link to Supabase Auth user
+  final List<String> specializations;
 
   Staff({
     required this.id,
@@ -24,9 +25,10 @@ class Staff {
     required this.position,
     this.hireDate,
     this.salary,
-    required this.isActive,
+    required this.staffStatus,
     this.notes,
     this.authUserId,
+    this.specializations = const [],
   });
 
   factory Staff.fromMap(Map<String, dynamic> map) {
@@ -41,9 +43,10 @@ class Staff {
       position: map['position'] ?? 'Technician',
       hireDate: map['hire_date'] != null ? DateTime.parse(map['hire_date']) : null,
       salary: map['salary']?.toDouble(),
-      isActive: map['is_active'] ?? true,
+      staffStatus: ((map['staff_status'] ?? 'Active').toString()),
       notes: map['notes'],
       authUserId: map['auth_user_id'],
+      specializations: (map['specializations'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 
@@ -59,9 +62,10 @@ class Staff {
       'position': position,
       'hire_date': hireDate?.toIso8601String().split('T')[0], // Date only
       'salary': salary,
-      'is_active': isActive,
+      'staff_status': staffStatus,
       'notes': notes,
       'auth_user_id': authUserId,
+      'specializations': specializations,
     };
   }
 
@@ -76,9 +80,10 @@ class Staff {
     String? position,
     DateTime? hireDate,
     double? salary,
-    bool? isActive,
+    String? staffStatus,
     String? notes,
     String? authUserId,
+    List<String>? specializations,
   }) {
     return Staff(
       id: id ?? this.id,
@@ -91,9 +96,10 @@ class Staff {
       position: position ?? this.position,
       hireDate: hireDate ?? this.hireDate,
       salary: salary ?? this.salary,
-      isActive: isActive ?? this.isActive,
+      staffStatus: staffStatus ?? this.staffStatus,
       notes: notes ?? this.notes,
       authUserId: authUserId ?? this.authUserId,
+      specializations: specializations ?? this.specializations,
     );
   }
 }

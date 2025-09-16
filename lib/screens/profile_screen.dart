@@ -28,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('ProfileScreen initState');
     _loadStaff();
   }
 
@@ -41,11 +42,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         return;
       }
+      debugPrint('ProfileScreen _loadStaff: before fetchByEmail(email=$email)');
       final staff = await _staffService.fetchByEmail(email);
-      // final stored = LocalStorage.getString('profile_image_${staff?.id ?? email}');
+      debugPrint('ProfileScreen _loadStaff: after fetchByEmail, mounted=$mounted, staffId=${staff?.id}');
+      final stored = LocalStorage.getString('profile_image_${staff?.id ?? email}');
       setState(() {
         _staff = staff;
-        // _profileImagePath = stored;
+        _profileImagePath = stored;
         _isLoading = false;
         if (staff == null) {
           _error = 'Staff record not found for $email';
@@ -55,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _loadStats(staff);
       }
     } catch (e) {
+      debugPrint('ProfileScreen _loadStaff error: $e');
       setState(() {
         _error = 'Failed to load profile';
         _isLoading = false;
@@ -138,6 +142,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    debugPrint('ProfileScreen dispose');
+    super.dispose();
   }
 
   @override
@@ -319,8 +329,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      // Specializations not present in current Staff model
-                      _buildSpecializationChip(_staff?.position ?? 'Technician'),
+                      if ((_staff?.specializations ?? []).isEmpty)
+                        _buildSpecializationChip('No specializations set')
+                      else
+                        ..._staff!.specializations.map(_buildSpecializationChip),
                     ],
                   ),
                 ],

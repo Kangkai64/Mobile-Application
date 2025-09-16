@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/staff.dart';
 import '../services/staff_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'approve_staff_screen.dart';
 
 class StaffManagementScreen extends StatefulWidget {
   const StaffManagementScreen({super.key});
@@ -124,6 +125,76 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     }
   }
 
+  void _openApprovals() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ApproveStaffScreen()),
+    );
+  }
+
+  Future<void> _resetPassword(Staff staff) async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'New Password'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final pwd = controller.text.trim();
+    if (pwd.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 6 characters')),
+      );
+      return;
+    }
+    final success = await _staffService.resetStaffPassword(staff.email, pwd);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(success ? 'Password reset' : 'Reset failed')),
+    );
+  }
+
+  Future<void> _deactivate(Staff staff) async {
+    await _staffService.deactivateStaff(staff.id);
+    _loadStaff();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deactivated ${staff.name}')),
+    );
+  }
+
+  Future<void> _reject(Staff staff) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reject Staff'),
+        content: Text('Reject ${staff.email}? This revokes any access.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reject')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _staffService.rejectStaff(staff.id);
+    _loadStaff();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Staff rejected')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,6 +203,11 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            tooltip: 'Pending approvals',
+            onPressed: _openApprovals,
+            icon: const Icon(Icons.how_to_reg),
+          ),
           IconButton(
             onPressed: _addStaff,
             icon: const Icon(Icons.add),
@@ -167,7 +243,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(staff.email),
-                            Text('${staff.position} • ${staff.contactNumber}'),
+                            Text('${staff.position} • ${staff.contactNumber}')
                           ],
                         ),
                         trailing: PopupMenuButton(
@@ -179,6 +255,36 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                                   Icon(Icons.edit),
                                   SizedBox(width: 8),
                                   Text('Edit'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'reset',
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.lock_reset),
+                                  SizedBox(width: 8),
+                                  Text('Reset Password'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'deactivate',
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.pause_circle_filled, color: Colors.orange),
+                                  SizedBox(width: 8),
+                                  Text('Deactivate', style: TextStyle(color: Colors.orange)),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'reject',
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.block, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Reject', style: TextStyle(color: Colors.red)),
                                 ],
                               ),
                             ),
@@ -196,6 +302,12 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                           onSelected: (value) {
                             if (value == 'edit') {
                               _editStaff(staff);
+                            } else if (value == 'reset') {
+                              _resetPassword(staff);
+                            } else if (value == 'deactivate') {
+                              _deactivate(staff);
+                            } else if (value == 'reject') {
+                              _reject(staff);
                             } else if (value == 'delete') {
                               _deleteStaff(staff);
                             }
@@ -235,6 +347,32 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
   bool _isLoading = false;
   bool _isEdit = false;
 
+  // New: status and specializations editing
+  String _staffStatus = 'Active';
+  final List<String> _allSpecializations = const [
+    'Engine Repair',
+    'Transmission',
+    'Electrical Systems',
+    'Brake Systems',
+    'Air Conditioning',
+    'Suspension',
+    'Exhaust Systems',
+    'Fuel Systems',
+    'Cooling Systems',
+    'Steering Systems',
+    'Bodywork',
+    'Paint and Finishing',
+    'Tire Services',
+    'Diagnostic Systems',
+    'Hybrid/Electric Vehicles',
+    'Diesel Engines',
+    'Motorcycle Repair',
+    'Heavy Vehicle Repair',
+    'Auto Glass',
+    'Interior Repair',
+  ];
+  final Set<String> _selectedSpecializations = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -249,6 +387,10 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
       _salaryController.text = staff.salary?.toString() ?? '';
       _notesController.text = staff.notes ?? '';
       _hireDate = staff.hireDate;
+      _staffStatus = staff.staffStatus;
+      _selectedSpecializations
+        ..clear()
+        ..addAll(staff.specializations);
     }
   }
 
@@ -292,6 +434,8 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
         'salary': _salaryController.text.trim().isEmpty ? null : double.tryParse(_salaryController.text.trim()),
         'hire_date': _hireDate?.toIso8601String().split('T')[0],
         'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        'staff_status': _staffStatus,
+        'specializations': _selectedSpecializations.toList(),
       };
 
       if (_isEdit) {
@@ -396,6 +540,46 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
                       ? '${_hireDate!.day}/${_hireDate!.month}/${_hireDate!.year}'
                       : 'Select date'),
                 ),
+              ),
+              const SizedBox(height: 16),
+              // New: Staff Status dropdown
+              DropdownButtonFormField<String>(
+                value: _staffStatus,
+                decoration: const InputDecoration(labelText: 'Status *'),
+                items: const [
+                  DropdownMenuItem(value: 'Active', child: Text('Active')),
+                  DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                  DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+                  DropdownMenuItem(value: 'Rejected', child: Text('Rejected')),
+                ],
+                onChanged: (v) => setState(() => _staffStatus = v ?? 'Active'),
+              ),
+              const SizedBox(height: 16),
+              // New: Specializations multiselect chips
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Specializations', style: Theme.of(context).textTheme.bodyMedium),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _allSpecializations.map((sp) {
+                  final selected = _selectedSpecializations.contains(sp);
+                  return FilterChip(
+                    label: Text(sp),
+                    selected: selected,
+                    onSelected: (val) {
+                      setState(() {
+                        if (val) {
+                          _selectedSpecializations.add(sp);
+                        } else {
+                          _selectedSpecializations.remove(sp);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
               if (!_isEdit) ...[

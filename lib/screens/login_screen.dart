@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // First validate that the email belongs to an active staff member
       final isValidStaff = await _staffService.validateStaffLogin(_emailController.text.trim());
       if (!isValidStaff) {
-        setState(() { _error = 'Access denied. Please contact administrator.'; });
+        setState(() { _error = 'Access denied. Your account may be pending approval.'; });
         return;
       }
 
@@ -63,19 +63,24 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signUp() async {
+  Future<void> _requestAccess() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isSignUp = true; _error = null; });
     try {
-      final auth = Supabase.instance.client.auth;
-      await auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final staff = await _staffService.requestAccount(email: _emailController.text.trim());
+      if (!mounted) return;
+      if (staff != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request submitted. You\'ll be notified when approved.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } on AuthException catch (e) {
       setState(() { _error = e.message; });
     } catch (e) {
-      setState(() { _error = 'Unexpected error, please try again.'; });
+      setState(() { _error = 'Failed to submit request. Please try again.'; });
     } finally {
       if (mounted) setState(() { _isSignUp = false; });
     }
@@ -137,8 +142,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: _isSignUp ? null : _signUp,
-                                  child: _isSignUp ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Sign Up'),
+                                  onPressed: _isSignUp ? null : _requestAccess,
+                                  child: _isSignUp ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Request Access'),
                                 ),
                               ),
                             ],
