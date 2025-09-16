@@ -1,0 +1,643 @@
+-- GreenStem Car Workshop Management System - Complete Database Schema
+
+-- =============================================
+-- STAFF TABLE
+-- =============================================
+create table public."Staff" (
+  id character varying not null,
+  created_at timestamp with time zone not null default now(),
+  name character varying not null,
+  email character varying not null,
+  contact_number character varying null,
+  staff_status text null default 'Active'::text,
+  auth_user_id character varying null,
+  address text null,
+  hire_date date null,
+  salary numeric(10, 2) null,
+  position character varying not null default 'Mechanic'::character varying,
+  updated_at timestamp with time zone null default now(),
+  specializations text[] null default array[]::text[],
+  constraint Staff_pkey primary key (id),
+  constraint Staff_email_key unique (email),
+  constraint staff_auth_user_id_key unique (auth_user_id),
+  constraint staff_salary_check check ((salary >= (0)::numeric)),
+  constraint staff_specializations_check check (
+    (
+      specializations <@ array[
+        'Engine Repair'::text,
+        'Transmission'::text,
+        'Electrical Systems'::text,
+        'Brake Systems'::text,
+        'Air Conditioning'::text,
+        'Suspension'::text,
+        'Exhaust Systems'::text,
+        'Fuel Systems'::text,
+        'Cooling Systems'::text,
+        'Steering Systems'::text,
+        'Bodywork'::text,
+        'Paint and Finishing'::text,
+        'Tire Services'::text,
+        'Diagnostic Systems'::text,
+        'Hybrid/Electric Vehicles'::text,
+        'Diesel Engines'::text,
+        'Motorcycle Repair'::text,
+        'Heavy Vehicle Repair'::text,
+        'Auto Glass'::text,
+        'Interior Repair'::text
+      ]
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_staff_email on public."Staff" using btree (email) TABLESPACE pg_default;
+
+create index IF not exists idx_staff_contact_number on public."Staff" using btree (contact_number) TABLESPACE pg_default;
+
+create trigger staff_hire_date_trigger BEFORE INSERT
+or
+update on "Staff" for EACH row
+execute FUNCTION set_hire_date ();
+
+create trigger trigger_generate_staff_id BEFORE INSERT on "Staff" for EACH row
+execute FUNCTION generate_staff_id ();
+
+create trigger trigger_update_staff_updated_at
+after
+update on "Staff" for EACH row
+execute FUNCTION update_staff_updated_at ();
+
+create trigger validate_contact_trigger BEFORE INSERT
+or
+update on "Staff" for EACH row
+execute FUNCTION validate_malaysian_contact ();
+
+-- =============================================
+-- CUSTOMERS TABLE
+-- =============================================
+CREATE TABLE public."Customers" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    name character varying NOT NULL,
+    email character varying NULL,
+    contact_number character varying NOT NULL,
+    address text NULL,
+    date_of_birth date NULL,
+    gender character varying(10) NULL,
+    notes text NULL,
+    CONSTRAINT Customers_pkey PRIMARY KEY (id),
+    CONSTRAINT Customers_email_key UNIQUE (email),
+    CONSTRAINT Customers_gender_check CHECK (gender IN ('Male', 'Female', 'Other'))
+) TABLESPACE pg_default;
+
+-- Create sequence for customer IDs
+CREATE SEQUENCE IF NOT EXISTS customers_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for customers
+CREATE OR REPLACE FUNCTION generate_customer_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'C' || LPAD(nextval('customers_sequence')::text, 8, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the Customers table
+DROP TRIGGER IF EXISTS trigger_generate_customer_id ON "Customers";
+CREATE TRIGGER trigger_generate_customer_id
+    BEFORE INSERT ON "Customers"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_customer_id();
+
+-- =============================================
+-- VEHICLES TABLE
+-- =============================================
+CREATE TABLE public."Vehicles" (
+    license_plate character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    customer_id character varying NOT NULL,
+    make character varying NOT NULL,
+    model character varying NOT NULL,
+    year integer NOT NULL,
+    color character varying NULL,
+    vin character varying NULL,
+    engine_type character varying NULL,
+    mileage integer DEFAULT 0,
+    notes text NULL,
+    CONSTRAINT Vehicles_pkey PRIMARY KEY (license_plate),
+    CONSTRAINT Vehicles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES "Customers"(id) ON DELETE CASCADE,
+    CONSTRAINT Vehicles_year_check CHECK (year >= 1900 AND year <= EXTRACT(YEAR FROM CURRENT_DATE) + 2)
+) TABLESPACE pg_default;
+
+-- =============================================
+-- SERVICES TABLE
+-- =============================================
+CREATE TABLE public."Services" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    name character varying NOT NULL,
+    description text NULL,
+    base_price decimal(10,2) NOT NULL DEFAULT 0.00,
+    estimated_duration integer NOT NULL DEFAULT 60, -- in minutes
+    category character varying NOT NULL DEFAULT 'General',
+    is_active boolean NOT NULL DEFAULT true,
+    CONSTRAINT Services_pkey PRIMARY KEY (id),
+    CONSTRAINT Services_base_price_check CHECK (base_price >= 0),
+    CONSTRAINT Services_estimated_duration_check CHECK (estimated_duration > 0)
+) TABLESPACE pg_default;
+
+-- Create sequence for service IDs
+CREATE SEQUENCE IF NOT EXISTS services_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for services
+CREATE OR REPLACE FUNCTION generate_service_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'SV' || LPAD(nextval('services_sequence')::text, 7, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the Services table
+DROP TRIGGER IF EXISTS trigger_generate_service_id ON "Services";
+CREATE TRIGGER trigger_generate_service_id
+    BEFORE INSERT ON "Services"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_service_id();
+
+-- =============================================
+-- PARTS TABLE
+-- =============================================
+CREATE TABLE public."Parts" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    name character varying NOT NULL,
+    part_number character varying NULL,
+    description text NULL,
+    unit_price decimal(10,2) NOT NULL DEFAULT 0.00,
+    stock_quantity integer NOT NULL DEFAULT 0,
+    minimum_stock integer DEFAULT 5,
+    supplier character varying NULL,
+    category character varying NOT NULL DEFAULT 'General',
+    is_active boolean NOT NULL DEFAULT true,
+    CONSTRAINT Parts_pkey PRIMARY KEY (id),
+    CONSTRAINT Parts_part_number_key UNIQUE (part_number),
+    CONSTRAINT Parts_unit_price_check CHECK (unit_price >= 0),
+    CONSTRAINT Parts_stock_quantity_check CHECK (stock_quantity >= 0)
+) TABLESPACE pg_default;
+
+-- Create sequence for part IDs
+CREATE SEQUENCE IF NOT EXISTS parts_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for parts
+CREATE OR REPLACE FUNCTION generate_part_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'P' || LPAD(nextval('parts_sequence')::text, 8, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the Parts table
+DROP TRIGGER IF EXISTS trigger_generate_part_id ON "Parts";
+CREATE TRIGGER trigger_generate_part_id
+    BEFORE INSERT ON "Parts"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_part_id();
+
+-- =============================================
+-- WORK ORDERS TABLE
+-- =============================================
+CREATE TABLE public."WorkOrders" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    customer_id character varying NOT NULL,
+    license_plate character varying NOT NULL,
+    assigned_staff_id character varying NULL,
+    status character varying NOT NULL DEFAULT 'Pending',
+    priority character varying NOT NULL DEFAULT 'Medium',
+    scheduled_date timestamp with time zone NULL,
+    started_at timestamp with time zone NULL,
+    completed_at timestamp with time zone NULL,
+    estimated_completion timestamp with time zone NULL,
+    total_amount decimal(10,2) DEFAULT 0.00,
+    paid_amount decimal(10,2) DEFAULT 0.00,
+    payment_status character varying NOT NULL DEFAULT 'Pending',
+    customer_notes text NULL,
+    internal_notes text NULL,
+    CONSTRAINT WorkOrders_pkey PRIMARY KEY (id),
+    CONSTRAINT WorkOrders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES "Customers"(id),
+    CONSTRAINT WorkOrders_license_plate_fkey FOREIGN KEY (license_plate) REFERENCES "Vehicles"(license_plate),
+    CONSTRAINT WorkOrders_assigned_staff_id_fkey FOREIGN KEY (assigned_staff_id) REFERENCES "Staff"(id),
+    CONSTRAINT WorkOrders_status_check CHECK (status IN ('Pending', 'In Progress', 'Completed', 'Cancelled', 'On Hold')),
+    CONSTRAINT WorkOrders_priority_check CHECK (priority IN ('Low', 'Medium', 'High', 'Urgent')),
+    CONSTRAINT WorkOrders_payment_status_check CHECK (payment_status IN ('Pending', 'Partial', 'Paid', 'Overdue'))
+) TABLESPACE pg_default;
+
+-- Create sequence for work order IDs
+CREATE SEQUENCE IF NOT EXISTS work_orders_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for work orders
+CREATE OR REPLACE FUNCTION generate_work_order_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'WO' || LPAD(nextval('work_orders_sequence')::text, 7, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the WorkOrders table
+DROP TRIGGER IF EXISTS trigger_generate_work_order_id ON "WorkOrders";
+CREATE TRIGGER trigger_generate_work_order_id
+    BEFORE INSERT ON "WorkOrders"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_work_order_id();
+
+-- =============================================
+-- WORK ORDER SERVICES TABLE (Junction table)
+-- =============================================
+CREATE TABLE public."WorkOrderServices" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    work_order_id character varying NOT NULL,
+    service_id character varying NOT NULL,
+    quantity integer NOT NULL DEFAULT 1,
+    unit_price decimal(10,2) NOT NULL,
+    total_price decimal(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
+    notes text NULL,
+    CONSTRAINT WorkOrderServices_pkey PRIMARY KEY (id),
+    CONSTRAINT WorkOrderServices_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES "WorkOrders"(id) ON DELETE CASCADE,
+    CONSTRAINT WorkOrderServices_service_id_fkey FOREIGN KEY (service_id) REFERENCES "Services"(id),
+    CONSTRAINT WorkOrderServices_quantity_check CHECK (quantity > 0),
+    CONSTRAINT WorkOrderServices_unit_price_check CHECK (unit_price >= 0)
+) TABLESPACE pg_default;
+
+-- Create sequence for work order services IDs
+CREATE SEQUENCE IF NOT EXISTS work_order_services_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for work order services
+CREATE OR REPLACE FUNCTION generate_work_order_service_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'WOS' || LPAD(nextval('work_order_services_sequence')::text, 6, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the WorkOrderServices table
+DROP TRIGGER IF EXISTS trigger_generate_work_order_service_id ON "WorkOrderServices";
+CREATE TRIGGER trigger_generate_work_order_service_id
+    BEFORE INSERT ON "WorkOrderServices"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_work_order_service_id();
+
+-- =============================================
+-- WORK ORDER PARTS TABLE (Junction table)
+-- =============================================
+CREATE TABLE public."WorkOrderParts" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    work_order_id character varying NOT NULL,
+    part_id character varying NOT NULL,
+    quantity integer NOT NULL DEFAULT 1,
+    unit_price decimal(10,2) NOT NULL,
+    total_price decimal(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
+    notes text NULL,
+    CONSTRAINT WorkOrderParts_pkey PRIMARY KEY (id),
+    CONSTRAINT WorkOrderParts_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES "WorkOrders"(id) ON DELETE CASCADE,
+    CONSTRAINT WorkOrderParts_part_id_fkey FOREIGN KEY (part_id) REFERENCES "Parts"(id),
+    CONSTRAINT WorkOrderParts_quantity_check CHECK (quantity > 0),
+    CONSTRAINT WorkOrderParts_unit_price_check CHECK (unit_price >= 0)
+) TABLESPACE pg_default;
+
+-- Create sequence for work order parts IDs
+CREATE SEQUENCE IF NOT EXISTS work_order_parts_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for work order parts
+CREATE OR REPLACE FUNCTION generate_work_order_part_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'WOP' || LPAD(nextval('work_order_parts_sequence')::text, 6, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the WorkOrderParts table
+DROP TRIGGER IF EXISTS trigger_generate_work_order_part_id ON "WorkOrderParts";
+CREATE TRIGGER trigger_generate_work_order_part_id
+    BEFORE INSERT ON "WorkOrderParts"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_work_order_part_id();
+
+-- =============================================
+-- APPOINTMENTS TABLE
+-- =============================================
+CREATE TABLE public."Appointments" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    customer_id character varying NOT NULL,
+    license_plate character varying NULL,
+    assigned_staff_id character varying NULL,
+    appointment_date timestamp with time zone NOT NULL,
+    estimated_duration integer NOT NULL DEFAULT 60, -- in minutes
+    status character varying NOT NULL DEFAULT 'Scheduled',
+    service_type character varying NULL,
+    description text NULL,
+    customer_notes text NULL,
+    internal_notes text NULL,
+    reminder_sent boolean DEFAULT false,
+    CONSTRAINT Appointments_pkey PRIMARY KEY (id),
+    CONSTRAINT Appointments_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES "Customers"(id),
+    CONSTRAINT Appointments_license_plate_fkey FOREIGN KEY (license_plate) REFERENCES "Vehicles"(license_plate),
+    CONSTRAINT Appointments_staff_id_fkey FOREIGN KEY (assigned_staff_id) REFERENCES "Staff"(id),
+    CONSTRAINT Appointments_status_check CHECK (status IN ('Scheduled', 'Confirmed', 'In Progress', 'Completed', 'Cancelled', 'No Show'))
+) TABLESPACE pg_default;
+
+-- Create sequence for appointment IDs
+CREATE SEQUENCE IF NOT EXISTS appointments_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for appointments
+CREATE OR REPLACE FUNCTION generate_appointment_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'A' || LPAD(nextval('appointments_sequence')::text, 8, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the Appointments table
+DROP TRIGGER IF EXISTS trigger_generate_appointment_id ON "Appointments";
+CREATE TRIGGER trigger_generate_appointment_id
+    BEFORE INSERT ON "Appointments"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_appointment_id();
+
+-- =============================================
+-- PAYMENTS TABLE
+-- =============================================
+CREATE TABLE public."Payments" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    work_order_id character varying NOT NULL,
+    amount decimal(10,2) NOT NULL,
+    payment_method character varying NOT NULL DEFAULT 'Cash',
+    payment_date timestamp with time zone NOT NULL DEFAULT now(),
+    reference_number character varying NULL,
+    notes text NULL,
+    processed_by character varying NULL,
+    CONSTRAINT Payments_pkey PRIMARY KEY (id),
+    CONSTRAINT Payments_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES "WorkOrders"(id),
+    CONSTRAINT Payments_processed_by_fkey FOREIGN KEY (processed_by) REFERENCES "Staff"(id),
+    CONSTRAINT Payments_amount_check CHECK (amount > 0),
+    CONSTRAINT Payments_payment_method_check CHECK (payment_method IN ('Cash', 'Card', 'Bank Transfer', 'Check', 'Digital Wallet'))
+) TABLESPACE pg_default;
+
+-- Create sequence for payment IDs
+CREATE SEQUENCE IF NOT EXISTS payments_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for payments
+CREATE OR REPLACE FUNCTION generate_payment_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'PAY' || LPAD(nextval('payments_sequence')::text, 6, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the Payments table
+DROP TRIGGER IF EXISTS trigger_generate_payment_id ON "Payments";
+CREATE TRIGGER trigger_generate_payment_id
+    BEFORE INSERT ON "Payments"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_payment_id();
+
+-- =============================================
+-- INVENTORY TRANSACTIONS TABLE
+-- =============================================
+CREATE TABLE public."InventoryTransactions" (
+    id character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    part_id character varying NOT NULL,
+    transaction_type character varying NOT NULL,
+    quantity integer NOT NULL,
+    unit_price decimal(10,2) NULL,
+    reference_id character varying NULL, -- Could be work_order_id, supplier_id, etc.
+    reference_type character varying NULL, -- 'work_order', 'purchase', 'adjustment'
+    notes text NULL,
+    processed_by character varying NULL,
+    CONSTRAINT InventoryTransactions_pkey PRIMARY KEY (id),
+    CONSTRAINT InventoryTransactions_part_id_fkey FOREIGN KEY (part_id) REFERENCES "Parts"(id),
+    CONSTRAINT InventoryTransactions_processed_by_fkey FOREIGN KEY (processed_by) REFERENCES "Staff"(id),
+    CONSTRAINT InventoryTransactions_transaction_type_check CHECK (transaction_type IN ('IN', 'OUT', 'ADJUSTMENT')),
+    CONSTRAINT InventoryTransactions_quantity_check CHECK (quantity != 0)
+) TABLESPACE pg_default;
+
+-- Create sequence for inventory transaction IDs
+CREATE SEQUENCE IF NOT EXISTS inventory_transactions_sequence
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+-- Create the trigger function for inventory transactions
+CREATE OR REPLACE FUNCTION generate_inventory_transaction_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL OR NEW.id = '' THEN
+        NEW.id := 'IT' || LPAD(nextval('inventory_transactions_sequence')::text, 7, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on the InventoryTransactions table
+DROP TRIGGER IF EXISTS trigger_generate_inventory_transaction_id ON "InventoryTransactions";
+CREATE TRIGGER trigger_generate_inventory_transaction_id
+    BEFORE INSERT ON "InventoryTransactions"
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_inventory_transaction_id();
+
+-- =============================================
+-- GRANT PERMISSIONS
+-- =============================================
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO service_role;
+
+-- Grant table permissions (adjust as needed based on your RLS policies)
+GRANT ALL ON TABLE public."Customers" TO authenticated;
+GRANT ALL ON TABLE public."Vehicles" TO authenticated;
+GRANT ALL ON TABLE public."Services" TO authenticated;
+GRANT ALL ON TABLE public."Parts" TO authenticated;
+GRANT ALL ON TABLE public."WorkOrders" TO authenticated;
+GRANT ALL ON TABLE public."WorkOrderServices" TO authenticated;
+GRANT ALL ON TABLE public."WorkOrderParts" TO authenticated;
+GRANT ALL ON TABLE public."Appointments" TO authenticated;
+GRANT ALL ON TABLE public."Payments" TO authenticated;
+GRANT ALL ON TABLE public."InventoryTransactions" TO authenticated;
+
+-- =============================================
+-- INDEXES FOR PERFORMANCE
+-- =============================================
+-- Customer indexes
+CREATE INDEX idx_customers_email ON public."Customers"(email);
+CREATE INDEX idx_customers_contact_number ON public."Customers"(contact_number);
+
+-- Staff indexes
+CREATE INDEX idx_staff_email ON public."Staff"(email);
+CREATE INDEX idx_staff_contact_number ON public."Staff"(contact_number);
+
+-- Vehicle indexes
+CREATE INDEX idx_vehicles_customer_id ON public."Vehicles"(customer_id);
+CREATE INDEX idx_vehicles_license_plate ON public."Vehicles"(license_plate);
+
+-- Work Order indexes
+CREATE INDEX idx_work_orders_customer_id ON public."WorkOrders"(customer_id);
+CREATE INDEX idx_work_orders_license_plate ON public."WorkOrders"(license_plate);
+CREATE INDEX idx_work_orders_assigned_staff_id ON public."WorkOrders"(assigned_staff_id);
+CREATE INDEX idx_work_orders_status ON public."WorkOrders"(status);
+CREATE INDEX idx_work_orders_scheduled_date ON public."WorkOrders"(scheduled_date);
+
+-- Appointment indexes
+CREATE INDEX idx_appointments_customer_id ON public."Appointments"(customer_id);
+CREATE INDEX idx_appointments_license_plate ON public."Appointments"(license_plate);
+CREATE INDEX idx_appointments_staff_id ON public."Appointments"(assigned_staff_id);
+CREATE INDEX idx_appointments_date ON public."Appointments"(appointment_date);
+CREATE INDEX idx_appointments_status ON public."Appointments"(status);
+
+-- Parts and inventory indexes
+CREATE INDEX idx_parts_part_number ON public."Parts"(part_number);
+CREATE INDEX idx_parts_category ON public."Parts"(category);
+CREATE INDEX idx_inventory_transactions_part_id ON public."InventoryTransactions"(part_id);
+CREATE INDEX idx_inventory_transactions_reference ON public."InventoryTransactions"(reference_id, reference_type);
+
+-- Payment indexes
+CREATE INDEX idx_payments_work_order_id ON public."Payments"(work_order_id);
+CREATE INDEX idx_payments_payment_date ON public."Payments"(payment_date);
+
+-- =============================================
+-- USEFUL VIEWS
+-- =============================================
+
+-- Work Order Summary View
+CREATE OR REPLACE VIEW public."WorkOrderSummary" AS
+SELECT 
+    wo.id,
+    wo.created_at,
+    wo.status,
+    wo.priority,
+    c.name as customer_name,
+    c.contact_number as customer_contact,
+    v.license_plate,
+    v.make,
+    v.model,
+    s.name as assigned_staff,
+    wo.total_amount,
+    wo.paid_amount,
+    wo.payment_status,
+    wo.scheduled_date,
+    wo.started_at,
+    wo.completed_at
+FROM public."WorkOrders" wo
+LEFT JOIN public."Customers" c ON wo.customer_id = c.id
+LEFT JOIN public."Vehicles" v ON wo.license_plate = v.license_plate
+LEFT JOIN public."Staff" s ON wo.assigned_staff_id = s.id;
+
+-- Low Stock Parts View
+CREATE OR REPLACE VIEW public."LowStockParts" AS
+SELECT 
+    id,
+    name,
+    part_number,
+    stock_quantity,
+    minimum_stock,
+    (minimum_stock - stock_quantity) as shortage_amount,
+    supplier,
+    category
+FROM public."Parts"
+WHERE stock_quantity <= minimum_stock
+AND is_active = true
+ORDER BY (minimum_stock - stock_quantity) DESC;
+
+-- Daily Appointments View
+CREATE OR REPLACE VIEW public."DailyAppointments" AS
+SELECT 
+    a.id,
+    a.appointment_date,
+    a.estimated_duration,
+    a.status,
+    c.name as customer_name,
+    c.contact_number,
+    v.license_plate,
+    v.make,
+    v.model,
+    s.name as assigned_staff,
+    a.service_type,
+    a.description
+FROM public."Appointments" a
+LEFT JOIN public."Customers" c ON a.customer_id = c.id
+LEFT JOIN public."Vehicles" v ON a.license_plate = v.license_plate
+LEFT JOIN public."Staff" s ON a.assigned_staff_id = s.id
+WHERE DATE(a.appointment_date) = CURRENT_DATE
+ORDER BY a.appointment_date;

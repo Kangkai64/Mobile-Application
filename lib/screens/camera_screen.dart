@@ -1,7 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../utils/local_storage.dart';
 
-class CameraScreen extends StatelessWidget {
+class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
+
+  @override
+  State<CameraScreen> createState() => _CameraScreenState();
+}
+
+class _CameraScreenState extends State<CameraScreen> {
+  final ImagePicker _picker = ImagePicker();
+  List<String> _recentPhotos = <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _recentPhotos = LocalStorage.getStringList('recent_photos');
+  }
+
+  Future<void> _capturePhoto() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    if (photo != null) {
+      _recentPhotos = [photo.path, ..._recentPhotos];
+      // keep last 10
+      if (_recentPhotos.length > 10) {
+        _recentPhotos = _recentPhotos.take(10).toList();
+      }
+      await LocalStorage.setStringList('recent_photos', _recentPhotos);
+      if (mounted) setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo captured'), backgroundColor: Colors.green),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +68,7 @@ class CameraScreen extends StatelessWidget {
                   Icon(Icons.camera_alt, color: Colors.green[600], size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    '0 Photos',
+                    '${_recentPhotos.length} Photos',
                     style: TextStyle(
                       color: Colors.green[600],
                       fontSize: 12,
@@ -96,15 +131,7 @@ class CameraScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   Center(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement camera permission and photo capture
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Camera functionality coming soon!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
+                      onPressed: _capturePhoto,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
@@ -117,7 +144,7 @@ class CameraScreen extends StatelessWidget {
                         ),
                       ),
                       child: const Text(
-                        'Grant Permission',
+                        'Capture Photo',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -209,33 +236,52 @@ class CameraScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.photo_library_outlined,
-                          size: 48,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No photos yet',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Start documenting your work',
-                          style: TextStyle(
+                  if (_recentPhotos.isEmpty)
+                    Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.photo_library_outlined,
+                            size: 48,
                             color: Colors.grey[400],
-                            fontSize: 12,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'No photos yet',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Start documenting your work',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: _recentPhotos.length,
+                      itemBuilder: (context, index) {
+                        final path = _recentPhotos[index];
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(File(path), fit: BoxFit.cover),
+                        );
+                      },
                     ),
-                  ),
                 ],
               ),
             ),

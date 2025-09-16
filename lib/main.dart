@@ -3,17 +3,20 @@ import 'screens/dashboard_screen.dart';
 import 'screens/active_jobs_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/profile_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'screens/login_screen.dart';
+import 'utils/local_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import 'package:provider/provider.dart';
 import 'providers/work_orders_provider.dart';
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
   await Supabase.initialize(
-      url: 'https://dzajfltnnwjaoalaimob.supabase.co',
-      anonKey: 'sb_secret_V-wmePWdJH9SggsJXDvZxg_d-rttjIG'
+    url: 'https://dzajfltnnwjaoalaimob.supabase.co',
+    anonKey: 'sb_secret_V-wmePWdJH9SggsJXDvZxg_d-rttjIG',
   );
+  await LocalStorage.initialize();
   runApp(const MyApp());
 }
 
@@ -35,7 +38,7 @@ class _MyAppState extends State<MyApp> {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
           useMaterial3: true,
         ),
-        home: const MainScreen(),
+        home: const RootRouter(),
       ),
     );
   }
@@ -46,6 +49,38 @@ class MainScreen extends StatefulWidget {
 
   @override
   State<MainScreen> createState() => _MainScreenState();
+}
+
+class RootRouter extends StatefulWidget {
+  const RootRouter({super.key});
+
+  @override
+  State<RootRouter> createState() => _RootRouterState();
+}
+
+class _RootRouterState extends State<RootRouter> {
+  @override
+  void initState() {
+    super.initState();
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) async {
+      setState(() {});
+      final session = event.session;
+      if (session != null) {
+        await LocalStorage.setString('user_email', session.user.email ?? '');
+      } else {
+        await LocalStorage.remove('user_email');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      return const LoginScreen();
+    }
+    return const MainScreen();
+  }
 }
 
 class _MainScreenState extends State<MainScreen> {

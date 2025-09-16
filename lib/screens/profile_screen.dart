@@ -1,10 +1,152 @@
 import 'package:flutter/material.dart';
+import 'staff_management_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '../services/staff_service.dart';
+import '../models/staff.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../utils/local_storage.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final StaffService _staffService = StaffService();
+  Staff? _staff;
+  User? get _currentUser => Supabase.instance.client.auth.currentUser;
+  bool _isLoading = true;
+  String? _error;
+  final ImagePicker _picker = ImagePicker();
+  String? _profileImagePath;
+  int _jobsCompleted = 0;
+  double _totalHours = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStaff();
+  }
+
+  Future<void> _loadStaff() async {
+    try {
+      final email = Supabase.instance.client.auth.currentUser?.email;
+      if (email == null || email.isEmpty) {
+        setState(() {
+          _error = 'Not signed in.';
+          _isLoading = false;
+        });
+        return;
+      }
+      final staff = await _staffService.fetchByEmail(email);
+      // final stored = LocalStorage.getString('profile_image_${staff?.id ?? email}');
+      setState(() {
+        _staff = staff;
+        // _profileImagePath = stored;
+        _isLoading = false;
+        if (staff == null) {
+          _error = 'Staff record not found for $email';
+        }
+      });
+      if (staff != null) {
+        await _loadStats(staff);
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load profile';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadStats(Staff staff) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('WorkOrderSummary')
+          .select('*')
+          .eq('assigned_staff', staff.name);
+      if (response is List) {
+        int jobsCompleted = 0;
+        double totalHours = 0;
+        for (final row in response) {
+          final map = row as Map<String, dynamic>;
+          final status = (map['status'] ?? '').toString();
+          if (status == 'Completed') {
+            jobsCompleted += 1;
+          }
+          final startedAt = map['started_at'];
+          final completedAt = map['completed_at'];
+          if (startedAt != null && completedAt != null) {
+            try {
+              final start = DateTime.parse(startedAt as String);
+              final end = DateTime.parse(completedAt as String);
+              final diff = end.difference(start).inMinutes / 60.0;
+              if (diff.isFinite && diff > 0) {
+                totalHours += diff;
+              }
+            } catch (_) {}
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _jobsCompleted = jobsCompleted;
+            _totalHours = totalHours;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (image == null) return;
+      final key = 'profile_image_${_staff?.id ?? Supabase.instance.client.auth.currentUser?.email ?? 'user'}';
+      await LocalStorage.setString(key, image.path);
+      if (!mounted) return;
+      setState(() {
+        _profileImagePath = image.path;
+      });
+    } catch (_) {}
+  }
+
+  Widget _buildDefaultAvatar(String name) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: LinearGradient(
+          colors: [
+            Colors.blue.shade200,
+            Colors.blue.shade400,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -24,6 +166,21 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_error != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
             // User Information card
             Container(
               padding: const EdgeInsets.all(20),
@@ -41,17 +198,23 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: 30,
-                      color: Colors.green[600],
+                  InkWell(
+                    onTap: _pickProfileImage,
+                    borderRadius: BorderRadius.circular(30),
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _profileImagePath != null && _profileImagePath!.isNotEmpty
+                          ? Image.file(
+                              File(_profileImagePath!),
+                              fit: BoxFit.cover,
+                            )
+                          : _buildDefaultAvatar(_currentUser?.email ?? "user")
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -59,9 +222,9 @@ class ProfileScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Mike Wilson',
-                          style: TextStyle(
+                        Text(
+                          _staff?.name.isNotEmpty == true ? _staff!.name : 'Unknown',
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
@@ -69,7 +232,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Senior Mechanic',
+                          _staff?.position ?? '—',
                           style: TextStyle(
                             color: Colors.green[600],
                             fontSize: 16,
@@ -78,7 +241,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'ID: MW-2024-001',
+                          'ID: ${_staff?.id ?? '—'}',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -98,7 +261,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     Icons.emoji_events,
-                    '127',
+                    _jobsCompleted.toString(),
                     'Jobs Completed',
                     Colors.green,
                   ),
@@ -107,7 +270,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     Icons.access_time,
-                    '456',
+                    _totalHours.toStringAsFixed(1),
                     'Total Hours',
                     Colors.blue,
                   ),
@@ -156,9 +319,8 @@ class ProfileScreen extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildSpecializationChip('Engine Repair'),
-                      _buildSpecializationChip('Transmission'),
-                      _buildSpecializationChip('Electrical'),
+                      // Specializations not present in current Staff model
+                      _buildSpecializationChip(_staff?.position ?? 'Technician'),
                     ],
                   ),
                 ],
@@ -217,6 +379,19 @@ class ProfileScreen extends StatelessWidget {
                       );
                     },
                   ),
+                  if ((_staff?.position ?? '').toLowerCase() == 'admin')
+                    _buildSettingsItem(
+                      Icons.people,
+                      'Staff Management',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const StaffManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   _buildSettingsItem(
                     Icons.help_outline,
                     'Help & Support',
@@ -227,6 +402,13 @@ class ProfileScreen extends StatelessWidget {
                           backgroundColor: Colors.green,
                         ),
                       );
+                    },
+                  ),
+                  _buildSettingsItem(
+                    Icons.logout,
+                    'Sign Out',
+                    () async {
+                      await Supabase.instance.client.auth.signOut();
                     },
                   ),
                 ],
