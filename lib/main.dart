@@ -8,6 +8,7 @@ import 'utils/local_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import 'package:provider/provider.dart';
 import 'providers/work_orders_provider.dart';
+import 'providers/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,15 +31,34 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<WorkOrdersProvider>(
-      create: (_) => WorkOrdersProvider()..loadWorkOrders(),
-      child: MaterialApp(
-        title: 'Greenstem Workshop Management',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-          useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<WorkOrdersProvider>(
+          create: (_) => WorkOrdersProvider()..loadWorkOrders(),
         ),
-        home: const RootRouter(),
+        ChangeNotifierProvider<SettingsProvider>(
+          create: (_) => SettingsProvider()..load(),
+        ),
+      ],
+      child: Builder(
+        builder: (context) {
+          final settings = context.watch<SettingsProvider>();
+          return MaterialApp(
+            title: 'Greenstem Workshop Management',
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+              useMaterial3: true,
+              brightness: Brightness.light,
+            ),
+            darkTheme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.green, brightness: Brightness.dark),
+              useMaterial3: true,
+              brightness: Brightness.dark,
+            ),
+            themeMode: settings.themeMode,
+            home: const RootRouter(),
+          );
+        },
       ),
     );
   }

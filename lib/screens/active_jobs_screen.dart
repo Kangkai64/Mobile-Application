@@ -12,14 +12,14 @@ class ActiveJobsScreen extends StatelessWidget {
     final inProgress = provider.filterOrders(status: 'IN PROGRESS');
     final pending = provider.filterOrders(status: 'PENDING');
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Active Jobs',
           style: TextStyle(
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.w500,
           ),
@@ -52,7 +52,7 @@ class ActiveJobsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -70,12 +70,12 @@ class ActiveJobsScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.access_time, color: Colors.green[600], size: 20),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'In Progress',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -108,7 +108,7 @@ class ActiveJobsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -126,12 +126,12 @@ class ActiveJobsScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.schedule, color: Colors.orange[600], size: 20),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Pending',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -205,9 +205,9 @@ class ActiveJobsScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,10 +217,10 @@ class ActiveJobsScreen extends StatelessWidget {
               children: [
                 Text(
                   workOrder,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Row(
@@ -263,17 +263,17 @@ class ActiveJobsScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               description,
               style: TextStyle(
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -284,12 +284,12 @@ class ActiveJobsScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   vehicle,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   licensePlate,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14),
                 ),
               ],
             ),
@@ -300,7 +300,7 @@ class ActiveJobsScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   'Assigned to: $assignedTo',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14),
                 ),
               ],
             ),
@@ -310,7 +310,7 @@ class ActiveJobsScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   'Time spent: $timeSpent',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14),
                 ),
               ],
             ),
