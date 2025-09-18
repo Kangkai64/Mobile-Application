@@ -89,7 +89,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
 
-    final List<Widget> _screens = [
+    final List<Widget> screens = [
       const DashboardScreen(),
       const ActiveJobsScreen(),
       const CameraScreen(),
@@ -97,7 +97,7 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {

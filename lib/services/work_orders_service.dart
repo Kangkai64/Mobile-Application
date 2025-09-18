@@ -2,6 +2,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/work_orders.dart';
 
 class WorkOrdersService {
+  Future<bool> updateWorkOrderPart(String id, Map<String, dynamic> updates) async {
+    try {
+      await _supabase.from('WorkOrderParts')
+        .update(updates)
+        .eq('id', id);
+      return true;
+    } catch (e) {
+      print('Error updating WorkOrderPart: $e');
+      return false;
+    }
+  }
   final _supabase = Supabase.instance.client;
 
   Future<List<WorkOrders>> fetchAll() async {
@@ -43,5 +54,18 @@ class WorkOrdersService {
       return response > 0;
     }
     return true;
+  }
+
+  Future<List<Map<String, dynamic>>?> fetchAssignedParts(String workOrderId) async {
+    try {
+      final response = await _supabase
+          .from('WorkOrderParts')
+          .select('*, Parts(*)')
+          .eq('work_order_id', workOrderId);
+      return (response as List).map((row) => row as Map<String, dynamic>).toList();
+    } catch (error) {
+      print('Error fetching assigned parts: $error');
+      return null;
+    }
   }
 }

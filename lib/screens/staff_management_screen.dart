@@ -544,7 +544,7 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
               const SizedBox(height: 16),
               // New: Staff Status dropdown
               DropdownButtonFormField<String>(
-                value: _staffStatus,
+                initialValue: _staffStatus,
                 decoration: const InputDecoration(labelText: 'Status *'),
                 items: const [
                   DropdownMenuItem(value: 'Active', child: Text('Active')),

@@ -206,6 +206,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildJobCardWithOrder(BuildContext context, WorkOrders o) {
+    // Convert total_time (seconds) to h m s string
+    String timeSpent = '';
+    final int seconds = o.totalTime ?? 0;
+    if (seconds > 0) {
+      int hours = seconds ~/ 3600;
+      int minutes = (seconds % 3600) ~/ 60;
+      int secs = seconds % 60;
+      timeSpent = '${hours}h ${minutes}m ${secs}s';
+    } else {
+      timeSpent = '0h 0m 0s';
+    }
     return _buildJobCard(
       context,
       o.id,
@@ -216,7 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       o.vehicleName,
       o.licensePlate,
       o.assignedStaffId,
-      '',
+      timeSpent,
       customerName: o.customerName,
       customerEmail: o.customerEmail,
       customerPhone: o.customerPhone,

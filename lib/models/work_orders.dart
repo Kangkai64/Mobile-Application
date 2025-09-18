@@ -21,6 +21,7 @@ class WorkOrders {
   final String internalNotes;
   final Vehicles? vehicles;
   final Customers? customers;
+  final int? totalTime;
 
   WorkOrders({
     required this.id,
@@ -38,46 +39,48 @@ class WorkOrders {
     required this.paymentStatus,
     required this.customerNotes,
     required this.internalNotes,
-    required this.vehicles,
-    required this.customers,
+  required this.vehicles,
+  required this.customers,
+  this.totalTime,
   });
 
   factory WorkOrders.fromMap(Map<String, dynamic> map) {
-    return WorkOrders(
-      id: map['id'] ?? '',
-      createdAt: map['created_at'] != null
-          ? DateTime.parse(map['created_at'])
-          : DateTime.now(),
-      updatedAt: map['updated_at'] != null
-          ? DateTime.parse(map['updated_at'])
-          : DateTime.now(),
-      customerId: map['customer_id'] ?? '',
-      licensePlate: map['license_plate'] ?? '',
-      assignedStaffId: map['assigned_staff_id'] ?? '',
-      status: map['status'] ?? 'Pending',
-      priority: map['priority'] ?? 'Low',
-      scheduledDate: map['scheduled_date'] != null
-          ? DateTime.parse(map['scheduled_date'])
-          : DateTime.now(),
-      startedAt: map['started_at'] != null
-          ? DateTime.parse(map['started_at'])
-          : DateTime.now(),
-      completedAt: map['completed_at'] != null
-          ? DateTime.parse(map['completed_at'])
-          : DateTime.now(),
-      totalAmount: map['total_amount'] == null
-          ? 0.0
-          : (map['total_amount'] as num).toDouble(),
-      paymentStatus: map['payment_status'] ?? 'Pending',
-      customerNotes: map['customer_notes'] ?? '',
-      internalNotes: map['internal_notes'] ?? '',
-      vehicles: map['Vehicles'] != null
-          ? Vehicles.fromMap(map['Vehicles'] as Map<String, dynamic>)
-          : null,
-      customers: map['Customers'] != null
-          ? Customers.fromMap(map['Customers'] as Map<String, dynamic>)
-          : null,
-    );
+  return WorkOrders(
+    id: map['id'] ?? '',
+    createdAt: map['created_at'] != null
+      ? DateTime.parse(map['created_at'])
+      : DateTime.now(),
+    updatedAt: map['updated_at'] != null
+      ? DateTime.parse(map['updated_at'])
+      : DateTime.now(),
+    customerId: map['customer_id'] ?? '',
+    licensePlate: map['license_plate'] ?? '',
+    assignedStaffId: map['assigned_staff_id'] ?? '',
+    status: map['status'] ?? 'Pending',
+    priority: map['priority'] ?? 'Low',
+    scheduledDate: map['scheduled_date'] != null
+      ? DateTime.parse(map['scheduled_date'])
+      : DateTime.now(),
+    startedAt: map['started_at'] != null
+      ? DateTime.parse(map['started_at'])
+      : DateTime.now(),
+    completedAt: map['completed_at'] != null
+      ? DateTime.parse(map['completed_at'])
+      : DateTime.now(),
+    totalAmount: map['total_amount'] == null
+      ? 0.0
+      : (map['total_amount'] as num).toDouble(),
+    paymentStatus: map['payment_status'] ?? 'Pending',
+    customerNotes: map['customer_notes'] ?? '',
+    internalNotes: map['internal_notes'] ?? '',
+    vehicles: map['Vehicles'] != null
+      ? Vehicles.fromMap(map['Vehicles'] as Map<String, dynamic>)
+      : null,
+    customers: map['Customers'] != null
+      ? Customers.fromMap(map['Customers'] as Map<String, dynamic>)
+      : null,
+    totalTime: map['total_time'] is int ? map['total_time'] : (map['total_time'] != null ? int.tryParse(map['total_time'].toString()) : null),
+  );
   }
 
 
@@ -98,6 +101,7 @@ class WorkOrders {
       'payment_status': paymentStatus,
       'customer_notes': customerNotes,
       'internal_notes': internalNotes,
+      'total_time': totalTime,
     };
   }
 

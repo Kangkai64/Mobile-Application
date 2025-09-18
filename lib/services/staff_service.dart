@@ -33,8 +33,8 @@ class StaffService {
         .eq('id', id)
         .maybeSingle();
 
-    if (response == null || (response is Map && response.isEmpty)) return null;
-    return Staff.fromMap(response as Map<String, dynamic>);
+    if (response == null || (response.isEmpty)) return null;
+    return Staff.fromMap(response);
   }
 
   Future<Staff?> fetchByEmail(String email) async {
@@ -45,8 +45,8 @@ class StaffService {
         .eq('staff_status', 'Active')
         .maybeSingle();
 
-    if (response == null || (response is Map && response.isEmpty)) return null;
-    return Staff.fromMap(response as Map<String, dynamic>);
+    if (response == null || (response.isEmpty)) return null;
+    return Staff.fromMap(response);
   }
 
   /// Request an account: creates a pending Staff record without creating an Auth user
@@ -119,7 +119,7 @@ class StaffService {
         .select()
         .single();
 
-    return Staff.fromMap(updated as Map<String, dynamic>);
+    return Staff.fromMap(updated);
   }
 
   Future<bool> rejectStaff(String id) async {

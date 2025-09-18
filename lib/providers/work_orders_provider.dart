@@ -3,6 +3,16 @@ import '../models/work_orders.dart';
 import '../services/work_orders_service.dart';
 
 class WorkOrdersProvider extends ChangeNotifier {
+  Future<bool> updateWorkOrderPart(String id, Map<String, dynamic> updates) async {
+    try {
+      final success = await _service.updateWorkOrderPart(id, updates);
+      return success;
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+      return false;
+    }
+  }
   WorkOrdersProvider._internal();
   static final _instance = WorkOrdersProvider._internal();
   factory WorkOrdersProvider() => _instance;
@@ -111,6 +121,16 @@ class WorkOrdersProvider extends ChangeNotifier {
       _error = error.toString();
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>?> getAssignedPartsForWorkOrder(String workOrderId) async {
+    try {
+      return await _service.fetchAssignedParts(workOrderId);
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+      return null;
     }
   }
 

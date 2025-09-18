@@ -73,36 +73,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .from('WorkOrderSummary')
           .select('*')
           .eq('assigned_staff', staff.name);
-      if (response is List) {
-        int jobsCompleted = 0;
-        double totalHours = 0;
-        for (final row in response) {
-          final map = row as Map<String, dynamic>;
-          final status = (map['status'] ?? '').toString();
-          if (status == 'Completed') {
-            jobsCompleted += 1;
-          }
-          final startedAt = map['started_at'];
-          final completedAt = map['completed_at'];
-          if (startedAt != null && completedAt != null) {
-            try {
-              final start = DateTime.parse(startedAt as String);
-              final end = DateTime.parse(completedAt as String);
-              final diff = end.difference(start).inMinutes / 60.0;
-              if (diff.isFinite && diff > 0) {
-                totalHours += diff;
-              }
-            } catch (_) {}
-          }
+      int jobsCompleted = 0;
+      double totalHours = 0;
+      for (final row in response) {
+        final map = row;
+        final status = (map['status'] ?? '').toString();
+        if (status == 'Completed') {
+          jobsCompleted += 1;
         }
-        if (mounted) {
-          setState(() {
-            _jobsCompleted = jobsCompleted;
-            _totalHours = totalHours;
-          });
+        final startedAt = map['started_at'];
+        final completedAt = map['completed_at'];
+        if (startedAt != null && completedAt != null) {
+          try {
+            final start = DateTime.parse(startedAt as String);
+            final end = DateTime.parse(completedAt as String);
+            final diff = end.difference(start).inMinutes / 60.0;
+            if (diff.isFinite && diff > 0) {
+              totalHours += diff;
+            }
+          } catch (_) {}
         }
       }
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _jobsCompleted = jobsCompleted;
+          _totalHours = totalHours;
+        });
+      }
+        } catch (_) {}
   }
 
   Future<void> _pickProfileImage() async {
