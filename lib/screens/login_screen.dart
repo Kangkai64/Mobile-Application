@@ -97,11 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Greenstem Workshop',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-                ),
+                Image.asset('assets/images/logo.png'),
                 const SizedBox(height: 24),
                 Card(
                   elevation: 2,
