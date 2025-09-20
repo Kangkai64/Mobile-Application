@@ -9,8 +9,8 @@ class ActiveJobsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WorkOrdersProvider>();
-    final inProgress = provider.filterOrders(status: 'IN PROGRESS');
-    final pending = provider.filterOrders(status: 'PENDING');
+    final inProgress = provider.filterOrders(status: 'IN PROGRESS', filterByStaff: true);
+    final pending = provider.filterOrders(status: 'PENDING', filterByStaff: true);
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(

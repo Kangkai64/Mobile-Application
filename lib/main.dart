@@ -100,6 +100,11 @@ class _RootRouterState extends State<RootRouter> {
       if (session != null) {
         await LocalStorage.setString('user_email', session.user.email ?? '');
         _validateStaffUser();
+        // Refresh work orders when user changes
+        if (mounted) {
+          final workOrdersProvider = context.read<WorkOrdersProvider>();
+          await workOrdersProvider.refreshAll();
+        }
       } else {
         await LocalStorage.remove('user_email');
         setState(() {

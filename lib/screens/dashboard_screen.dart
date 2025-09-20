@@ -18,9 +18,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final workOrdersProvider = context.watch<WorkOrdersProvider>();
     final List<WorkOrders> allOrders = workOrdersProvider.workOrders ?? [];
     final List<WorkOrders> orders =
-        workOrdersProvider.filterOrders(status: _selectedStatus);
+        workOrdersProvider.filterOrders(status: _selectedStatus, filterByStaff: true);
 
-    int countByStatus(String status) => allOrders
+    int countByStatus(String status) => orders
         .where((o) => (o.status).toUpperCase() == status.toUpperCase())
         .length;
 
@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       DateTime now = DateTime.now();
       bool isSameDay(DateTime a, DateTime b) =>
           a.year == b.year && a.month == b.month && a.day == b.day;
-      return allOrders.where((o) => isSameDay(o.scheduledDate, now)).length;
+      return orders.where((o) => isSameDay(o.scheduledDate, now)).length;
     }
 
     return Scaffold(
@@ -88,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 children: [
                   _buildFilterTab(
-                    'All Jobs (${allOrders.length})',
+                    'All Jobs (${orders.length})',
                     _selectedStatus == null,
                     () {
                       setState(() => _selectedStatus = null);
