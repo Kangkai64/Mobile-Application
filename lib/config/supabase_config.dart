@@ -11,4 +11,5 @@ class SupabaseConfig {
   static const String s3AccessKey = 'd257ad0bb8240be00c71f3e9490828be';
   static const String s3SecretKey = 'a473682ac89fd55205c1e24a9f1c518272a63127a3a485df2f18560219c3f25a';
   static const String storageBucket = 'Work Order Photos';
+  static const String profileBucket = 'Profile';
 }

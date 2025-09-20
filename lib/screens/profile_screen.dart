@@ -145,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Delete old profile image if it exists
         if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
           try {
-            await _imageService.deleteImage(oldImageUrl);
+            await _imageService.deleteImage(oldImageUrl, 'Profile');
           } catch (e) {
             print('Failed to delete old profile image: $e');
             // Don't fail the entire operation if old image deletion fails
