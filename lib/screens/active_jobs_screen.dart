@@ -11,6 +11,35 @@ class ActiveJobsScreen extends StatelessWidget {
     final provider = context.watch<WorkOrdersProvider>();
     final inProgress = provider.filterOrders(status: 'IN PROGRESS', filterByStaff: true);
     final pending = provider.filterOrders(status: 'PENDING', filterByStaff: true);
+    
+    // Show loading indicator if data is still loading
+    if (provider.isLoading) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.background,
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
+          title: Text(
+            'Active Jobs',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading jobs...'),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(

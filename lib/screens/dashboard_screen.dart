@@ -124,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 24),
 
             // Job list
-            if (orders.isEmpty)
+            if (workOrdersProvider.isLoading)
               Center(
                 child: Column(
                   children: const [
@@ -132,6 +132,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     CircularProgressIndicator(),
                     SizedBox(height: 8),
                     Text('Loading work orders...'),
+                  ],
+                ),
+              )
+            else if (orders.isEmpty)
+              Center(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 24),
+                    Icon(
+                      Icons.work_outline,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No jobs assigned to you',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Check back later for new assignments',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                    ),
                   ],
                 ),
               )
