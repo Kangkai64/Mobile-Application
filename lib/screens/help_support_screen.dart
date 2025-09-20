@@ -5,44 +5,81 @@ class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
   Future<void> _callSupport(BuildContext context) async {
-    final Uri uri = Uri(scheme: 'tel', path: '+60362633933');
-    final bool canLaunch = await canLaunchUrl(uri);
-    if (canLaunch) {
-      final bool launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to open dialer on this device.')),
+    // Try multiple phone number formats
+    final List<String> phoneNumbers = [
+      '+60362633933',
+      'tel:+60362633933',
+      'tel:60362633933',
+      'tel:+603-6263-3933',
+    ];
+    
+    for (String phone in phoneNumbers) {
+      try {
+        print('Attempting to call: $phone');
+        final Uri uri = Uri.parse(phone);
+        
+        // Try different launch modes
+        final bool launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
         );
+        
+        print('Launch result for $phone: $launched');
+        
+        if (launched) {
+          return; // Success, exit function
+        }
+      } catch (e) {
+        print('Error launching $phone: $e');
       }
-    } else if (context.mounted) {
+    }
+    
+    // If all attempts failed
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No app available to handle phone calls.')),
+        const SnackBar(
+          content: Text('Unable to open dialer. Please call +603-6263-3933 manually.'),
+          duration: Duration(seconds: 5),
+        ),
       );
     }
   }
 
   Future<void> _emailSupport(BuildContext context) async {
-    final Uri uri = Uri(
-      scheme: 'mailto',
-      path: 'admin@greenstem.com.my',
-    );
-    final bool canLaunch = await canLaunchUrl(uri);
-    if (canLaunch) {
-      final bool launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to open email app on this device.')),
+    // Try multiple email formats and launch modes
+    final List<LaunchMode> launchModes = [
+      LaunchMode.externalApplication,
+      LaunchMode.externalNonBrowserApplication,
+      LaunchMode.platformDefault,
+    ];
+    
+    for (LaunchMode mode in launchModes) {
+      try {
+        final Uri uri = Uri.parse('mailto:admin@greenstem.com.my');
+        print('Attempting to email with mode $mode: ${uri.toString()}');
+        
+        final bool launched = await launchUrl(
+          uri,
+          mode: mode,
         );
+        
+        print('Email launch result with mode $mode: $launched');
+        
+        if (launched) {
+          return; // Success, exit function
+        }
+      } catch (e) {
+        print('Error launching email with mode $mode: $e');
       }
-    } else if (context.mounted) {
+    }
+    
+    // If all attempts failed
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No email app configured to send email.')),
+        const SnackBar(
+          content: Text('Unable to open email app. Please email admin@greenstem.com.my manually.'),
+          duration: Duration(seconds: 5),
+        ),
       );
     }
   }
