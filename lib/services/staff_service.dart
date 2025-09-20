@@ -1,49 +1,62 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/staff.dart';
+import 'supabase_service.dart';
 
 class StaffService {
-  final _supabase = Supabase.instance.client;
+  final _supabaseService = SupabaseService.instance;
 
   Future<List<Staff>> fetchAll() async {
-    final response = await _supabase
-        .from('Staff')
-        .select('*')
-        .eq('staff_status', 'Active')
-        .order('name');
+    final response = await _supabaseService.executeQuery(
+      'fetchAll',
+      (client) => client
+          .from('Staff')
+          .select('*')
+          .eq('staff_status', 'Active')
+          .order('name'),
+    );
     return (response as List)
         .map((row) => Staff.fromMap(row as Map<String, dynamic>))
         .toList();
   }
 
   Future<List<Staff>> fetchPending() async {
-    final response = await _supabase
-        .from('Staff')
-        .select('*')
-        .eq('staff_status', 'Pending')
-        .order('created_at');
+    final response = await _supabaseService.executeQuery(
+      'fetchPending',
+      (client) => client
+          .from('Staff')
+          .select('*')
+          .eq('staff_status', 'Pending')
+          .order('created_at'),
+    );
     return (response as List)
         .map((row) => Staff.fromMap(row as Map<String, dynamic>))
         .toList();
   }
 
   Future<Staff?> fetchById(String id) async {
-    final response = await _supabase
-        .from('Staff')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+    final response = await _supabaseService.executeQuery(
+      'fetchById',
+      (client) => client
+          .from('Staff')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle(),
+    );
 
     if (response == null || (response.isEmpty)) return null;
     return Staff.fromMap(response);
   }
 
   Future<Staff?> fetchByEmail(String email) async {
-    final response = await _supabase
-        .from('Staff')
-        .select('*')
-        .eq('email', email)
-        .eq('staff_status', 'Active')
-        .maybeSingle();
+    final response = await _supabaseService.executeQuery(
+      'fetchByEmail',
+      (client) => client
+          .from('Staff')
+          .select('*')
+          .eq('email', email)
+          .eq('staff_status', 'Active')
+          .maybeSingle(),
+    );
 
     if (response == null || (response.isEmpty)) return null;
     return Staff.fromMap(response);
@@ -66,11 +79,14 @@ class StaffService {
       'specializations': specializations ?? <String>[],
     };
 
-    final response = await _supabase
-        .from('Staff')
-        .insert(data)
-        .select()
-        .single();
+    final response = await _supabaseService.executeQuery(
+      'requestAccount',
+      (client) => client
+          .from('Staff')
+          .insert(data)
+          .select()
+          .single(),
+    );
 
     if (response.isEmpty) return null;
     return Staff.fromMap(response);
@@ -93,8 +109,8 @@ class StaffService {
       return staff;
     }
 
-    // Create Supabase Auth user
-    final authResponse = await _supabase.auth.admin.createUser(
+    // Create Supabase Auth user using service role
+    final authResponse = await _supabaseService.serviceClient.auth.admin.createUser(
       AdminUserAttributes(
         email: staff.email,
         password: password,
@@ -112,12 +128,15 @@ class StaffService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    final updated = await _supabase
-        .from('Staff')
-        .update(updates)
-        .eq('id', staffId)
-        .select()
-        .single();
+    final updated = await _supabaseService.executeQuery(
+      'approveStaff',
+      (client) => client
+          .from('Staff')
+          .update(updates)
+          .eq('id', staffId)
+          .select()
+          .single(),
+    );
 
     return Staff.fromMap(updated);
   }
@@ -129,25 +148,28 @@ class StaffService {
     // If there is an auth user, delete it to revoke access
     if (staff.authUserId != null) {
       try {
-        await _supabase.auth.admin.deleteUser(staff.authUserId!);
+        await _supabaseService.serviceClient.auth.admin.deleteUser(staff.authUserId!);
       } catch (_) {}
     }
 
-    await _supabase
-        .from('Staff')
-        .update({
-          'staff_status': 'Rejected',
-          'auth_user_id': null,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+    await _supabaseService.executeQuery(
+      'rejectStaff',
+      (client) => client
+          .from('Staff')
+          .update({
+            'staff_status': 'Rejected',
+            'auth_user_id': null,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', id),
+    );
     return true;
   }
 
   Future<Staff?> createStaff(Map<String, dynamic> data) async {
     try {
-      // First, create Supabase Auth user
-      final authResponse = await _supabase.auth.admin.createUser(
+      // First, create Supabase Auth user using service role
+      final authResponse = await _supabaseService.serviceClient.auth.admin.createUser(
         AdminUserAttributes(
           email: data['email'],
           password: data['password'] ?? 'admin123',
@@ -163,17 +185,20 @@ class StaffService {
       data['auth_user_id'] = authResponse.user!.id;
 
       // Create staff record
-      final response = await _supabase.from('Staff')
-          .insert(data)
-          .select()
-          .single();
+      final response = await _supabaseService.executeQuery(
+        'createStaff',
+        (client) => client.from('Staff')
+            .insert(data)
+            .select()
+            .single(),
+      );
 
       if (response.isEmpty) return null;
       return Staff.fromMap(response);
     } catch (e) {
       // If staff creation fails, try to clean up auth user
       try {
-        await _supabase.auth.admin.deleteUser(data['auth_user_id']);
+        await _supabaseService.serviceClient.auth.admin.deleteUser(data['auth_user_id']);
       } catch (_) {}
       rethrow;
     }
@@ -181,9 +206,12 @@ class StaffService {
 
   Future<bool> updateStaff(String id, Map<String, dynamic> updates) async {
     updates['updated_at'] = DateTime.now().toIso8601String();
-    await _supabase.from('Staff')
-        .update(updates)
-        .eq('id', id);
+    await _supabaseService.executeQuery(
+      'updateStaff',
+      (client) => client.from('Staff')
+          .update(updates)
+          .eq('id', id),
+    );
     return true;
   }
 
@@ -197,14 +225,17 @@ class StaffService {
     if (staff == null) return false;
 
     // Delete from Staff table
-    await _supabase.from('Staff')
-        .delete()
-        .eq('id', id);
+    await _supabaseService.executeQuery(
+      'deleteStaff',
+      (client) => client.from('Staff')
+          .delete()
+          .eq('id', id),
+    );
 
     // Delete auth user if exists
     if (staff.authUserId != null) {
       try {
-        await _supabase.auth.admin.deleteUser(staff.authUserId!);
+        await _supabaseService.serviceClient.auth.admin.deleteUser(staff.authUserId!);
       } catch (e) {
         // Log error but don't fail the operation
         print('Failed to delete auth user: $e');
@@ -219,7 +250,7 @@ class StaffService {
       final staff = await fetchByEmail(email);
       if (staff?.authUserId == null) return false;
 
-      await _supabase.auth.admin.updateUserById(
+      await _supabaseService.serviceClient.auth.admin.updateUserById(
         staff!.authUserId!,
         attributes: AdminUserAttributes(password: newPassword),
       );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../utils/local_storage.dart';
+import '../services/image_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -12,7 +14,9 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   final ImagePicker _picker = ImagePicker();
+  final ImageService _imageService = ImageService();
   List<String> _recentPhotos = <String>[];
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -21,19 +25,48 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _capturePhoto() async {
+    if (_isUploading) return;
+    
     final XFile? photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
     if (photo != null) {
-      _recentPhotos = [photo.path, ..._recentPhotos];
-      // keep last 10
-      if (_recentPhotos.length > 10) {
-        _recentPhotos = _recentPhotos.take(10).toList();
-      }
-      await LocalStorage.setStringList('recent_photos', _recentPhotos);
-      if (mounted) setState(() {});
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo captured'), backgroundColor: Colors.green),
-        );
+      setState(() {
+        _isUploading = true;
+      });
+      
+      try {
+        // Upload image to Supabase bucket
+        final imageFile = File(photo.path);
+        final imageUrl = await _imageService.uploadWorkshopImage(imageFile);
+        
+        // Add to recent photos list
+        _recentPhotos = [imageUrl, ..._recentPhotos];
+        // keep last 10
+        if (_recentPhotos.length > 10) {
+          _recentPhotos = _recentPhotos.take(10).toList();
+        }
+        
+        // Save to local storage for offline access
+        await LocalStorage.setStringList('recent_photos', _recentPhotos);
+        
+        if (mounted) {
+          setState(() {
+            _isUploading = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo captured and uploaded successfully'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isUploading = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload photo: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -131,9 +164,9 @@ class _CameraScreenState extends State<CameraScreen> {
                   const SizedBox(height: 20),
                   Center(
                     child: ElevatedButton(
-                      onPressed: _capturePhoto,
+                      onPressed: _isUploading ? null : _capturePhoto,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: _isUploading ? Colors.grey : Colors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
@@ -143,13 +176,29 @@ class _CameraScreenState extends State<CameraScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text(
-                        'Capture Photo',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isUploading
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Uploading...'),
+                              ],
+                            )
+                          : const Text(
+                              'Capture Photo',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -278,7 +327,27 @@ class _CameraScreenState extends State<CameraScreen> {
                         final path = _recentPhotos[index];
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.file(File(path), fit: BoxFit.cover),
+                          child: path.startsWith('http')
+                              ? Image.network(
+                                  path,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: const Icon(Icons.error, color: Colors.red),
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Image.file(File(path), fit: BoxFit.cover),
                         );
                       },
                     ),

@@ -49,8 +49,13 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     setState(() => _isLoading = true);
     try {
       final staff = await _staffService.fetchAll();
+      final currentUserEmail = Supabase.instance.client.auth.currentUser?.email;
+      
+      // Filter out the current user's own account
+      final filteredStaff = staff.where((s) => s.email != currentUserEmail).toList();
+      
       setState(() {
-        _staffList = staff;
+        _staffList = filteredStaff;
         _isLoading = false;
       });
     } catch (e) {

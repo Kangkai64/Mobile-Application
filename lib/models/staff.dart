@@ -11,8 +11,9 @@ class Staff {
   final double? salary;
   final String staffStatus;
   final String? notes;
-  final String? authUserId; // Link to Supabase Auth user
+  final String authUserId;
   final List<String> specializations;
+  final String? profileImageUrl;
 
   Staff({
     required this.id,
@@ -27,8 +28,9 @@ class Staff {
     this.salary,
     required this.staffStatus,
     this.notes,
-    this.authUserId,
+    required this.authUserId,
     this.specializations = const [],
+    this.profileImageUrl,
   });
 
   factory Staff.fromMap(Map<String, dynamic> map) {
@@ -47,6 +49,7 @@ class Staff {
       notes: map['notes'],
       authUserId: map['auth_user_id'],
       specializations: (map['specializations'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      profileImageUrl: map['profile_image_url'],
     );
   }
 
@@ -66,6 +69,7 @@ class Staff {
       'notes': notes,
       'auth_user_id': authUserId,
       'specializations': specializations,
+      'profile_image_url': profileImageUrl,
     };
   }
 
@@ -84,6 +88,7 @@ class Staff {
     String? notes,
     String? authUserId,
     List<String>? specializations,
+    String? profileImageUrl,
   }) {
     return Staff(
       id: id ?? this.id,
@@ -100,6 +105,7 @@ class Staff {
       notes: notes ?? this.notes,
       authUserId: authUserId ?? this.authUserId,
       specializations: specializations ?? this.specializations,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
     );
   }
 }

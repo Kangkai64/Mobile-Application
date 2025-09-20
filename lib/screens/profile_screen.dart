@@ -4,6 +4,7 @@ import 'app_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '../services/staff_service.dart';
+import '../services/image_service.dart';
 import '../models/staff.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -18,12 +19,13 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final StaffService _staffService = StaffService();
+  final ImageService _imageService = ImageService();
   Staff? _staff;
   User? get _currentUser => Supabase.instance.client.auth.currentUser;
   bool _isLoading = true;
   String? _error;
   final ImagePicker _picker = ImagePicker();
-  String? _profileImagePath;
+  String? _profileImageUrl;
   int _jobsCompleted = 0;
   double _totalHours = 0;
 
@@ -44,13 +46,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         return;
       }
-      debugPrint('ProfileScreen _loadStaff: before fetchByEmail(email=$email)');
       final staff = await _staffService.fetchByEmail(email);
-      debugPrint('ProfileScreen _loadStaff: after fetchByEmail, mounted=$mounted, staffId=${staff?.id}');
-      final stored = LocalStorage.getString('profile_image_${staff?.id ?? email}');
+      
       setState(() {
         _staff = staff;
-        _profileImagePath = stored;
+        _profileImageUrl = staff?.profileImageUrl;
         _isLoading = false;
         if (staff == null) {
           _error = 'Staff record not found for $email';
@@ -60,7 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _loadStats(staff);
       }
     } catch (e) {
-      debugPrint('ProfileScreen _loadStaff error: $e');
       setState(() {
         _error = 'Failed to load profile';
         _isLoading = false;
@@ -109,13 +108,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
       if (image == null) return;
-      final key = 'profile_image_${_staff?.id ?? Supabase.instance.client.auth.currentUser?.email ?? 'user'}';
-      await LocalStorage.setString(key, image.path);
-      if (!mounted) return;
-      setState(() {
-        _profileImagePath = image.path;
-      });
-    } catch (_) {}
+      
+      if (_staff?.id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please wait for profile to load'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
+      try {
+        // Store old image URL for deletion
+        final oldImageUrl = _profileImageUrl;
+        
+        // Upload new image to Supabase bucket
+        final imageFile = File(image.path);
+        final imageUrl = await _imageService.uploadProfileImage(imageFile, _staff!.authUserId);
+        
+        // Update the staff record in the database
+        await _staffService.updateStaff(_staff!.id, {
+          'profile_image_url': imageUrl,
+        });
+        
+        // Store URL in local storage for backward compatibility
+        final key = 'profile_image_${_staff!.authUserId}';
+        await LocalStorage.setString(key, imageUrl);
+        
+        // Delete old profile image if it exists
+        if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
+          try {
+            await _imageService.deleteImage(oldImageUrl);
+          } catch (e) {
+            print('Failed to delete old profile image: $e');
+            // Don't fail the entire operation if old image deletion fails
+          }
+        }
+        
+        if (!mounted) return;
+        
+        // Update the staff object and UI
+        setState(() {
+          _staff = _staff!.copyWith(profileImageUrl: imageUrl);
+          _profileImageUrl = imageUrl;
+        });
+        
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile image updated successfully'), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error selecting image: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Widget _buildDefaultAvatar(String name) {
@@ -219,10 +282,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: _profileImagePath != null && _profileImagePath!.isNotEmpty
-                          ? Image.file(
-                              File(_profileImagePath!),
+                      child: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                          ? Image.network(
+                              _profileImageUrl!,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildDefaultAvatar(_currentUser?.email ?? "user");
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              },
                             )
                           : _buildDefaultAvatar(_currentUser?.email ?? "user")
                     ),
