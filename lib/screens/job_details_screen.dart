@@ -1,8 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/work_orders_provider.dart';
-
-
+import 'package:signature/signature.dart';
 
 class JobDetailsScreen extends StatefulWidget {
   final String workOrder;
@@ -39,6 +40,20 @@ class JobDetailsScreen extends StatefulWidget {
 }
 
 class _JobDetailsScreenState extends State<JobDetailsScreen> {
+  final SignatureController _signatureController = SignatureController(
+    penStrokeWidth: 2,
+    penColor: Colors.black,
+    exportBackgroundColor: Colors.white,
+  );
+  bool _showSignatureDialog = false;
+  bool _isProcessingSignOff = false;
+
+  @override
+  void dispose() {
+    _signatureController.dispose();
+    super.dispose();
+  }
+
   // Update total_time in WorkOrders table for finished assigned parts
   Future<void> _updateTotalTimeToWorkOrder() async {
     Duration total = Duration.zero;
@@ -48,7 +63,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       if (startedAt != null && completedAt != null) {
         final start = DateTime.parse(startedAt);
         final end = DateTime.parse(completedAt);
-        final diff = end.difference(start) - Duration(hours: 8); // Subtract 8 hours
+        final diff =
+            end.difference(start) - Duration(hours: 8); // Subtract 8 hours
         if (!diff.isNegative) total += diff;
       }
     }
@@ -58,41 +74,266 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       'updated_at': DateTime.now().toIso8601String(),
     });
   }
+
   TextEditingController _notesController = TextEditingController();
   bool _isSavingNotes = false;
+
+  void _showSignOffDialog() {
+    setState(() {
+      _showSignatureDialog = true;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Digital Sign-off'),
+              content: Container(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Please sign below to confirm completion of work order: ${widget.workOrder}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Customer: ${widget.customerName.isNotEmpty ? widget.customerName : widget.assignedTo}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'Vehicle: ${widget.vehicle}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Signature:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Signature(
+                          controller: _signatureController,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            _signatureController.clear();
+                          },
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isProcessingSignOff
+                      ? null
+                      : () {
+                          _signatureController.clear();
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _showSignatureDialog = false;
+                          });
+                        },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: _isProcessingSignOff
+                      ? null
+                      : () async {
+                          if (_signatureController.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please provide a signature before confirming.',
+                                ),
+                                backgroundColor: Colors.red,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() {
+                            _isProcessingSignOff = true;
+                          });
+
+                          await _processDigitalSignOff();
+
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _showSignatureDialog = false;
+                            _isProcessingSignOff = false;
+                          });
+                        },
+
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+
+                  child: _isProcessingSignOff
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Confirm Sign-off'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _processDigitalSignOff() async {
+    try {
+      final signatureBytes = await _signatureController.toPngBytes();
+
+      if (signatureBytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to capture signature. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Convert to base64 for storage
+      final signatureBase64 = base64Encode(signatureBytes);
+      final provider = context.read<WorkOrdersProvider>();
+
+      // Update work order with sign-off data
+      final success = await provider.updateWorkOrder(widget.workOrder, {
+        'status': 'Signed Off',
+        'signed_off_at': DateTime.now().toIso8601String(),
+        'customer_signature': signatureBase64,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      if (success && mounted) {
+        setState(() {
+          currentStatusDisplay = 'Signed Off';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Work order successfully signed off!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        _signatureController.clear();
+      } else if (mounted) {
+        final providerError = context.read<WorkOrdersProvider>().error;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to complete sign-off ${providerError != null ? ": $providerError" : ''}',
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error during sign-off: ${error.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     currentStatusDisplay = _toDisplayStatus(widget.status);
     _loadAssignedParts();
-    _notesController.text = widget.description; // Default to description, update if notes available
+    _notesController.text =
+        widget.description; // Default to description, update if notes available
   }
 
   Future<void> _updateNotes() async {
-    setState(() { _isSavingNotes = true; });
+    setState(() {
+      _isSavingNotes = true;
+    });
     final provider = context.read<WorkOrdersProvider>();
     final success = await provider.updateWorkOrder(widget.workOrder, {
       'internal_notes': _notesController.text,
       'updated_at': DateTime.now().toIso8601String(),
     });
-    setState(() { _isSavingNotes = false; });
+    setState(() {
+      _isSavingNotes = false;
+    });
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Notes updated.'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+        SnackBar(
+          content: Text('Notes updated.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update notes.'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
+        SnackBar(
+          content: Text('Failed to update notes.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
       );
     }
   }
+
   // Format completed date for user-friendly display
   String _formatCompletedDate(dynamic completedAt) {
     try {
       DateTime dt = completedAt is DateTime
-        ? completedAt
-        : DateTime.parse(completedAt.toString());
+          ? completedAt
+          : DateTime.parse(completedAt.toString());
       // Format: Sep 18, 2025, 8:40 AM
       return '${_monthShort(dt.month)} ${dt.day}, ${dt.year}, ${_formatHourMinute(dt)}';
     } catch (e) {
@@ -101,7 +342,20 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   String _monthShort(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -112,22 +366,33 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     String minute = dt.minute.toString().padLeft(2, '0');
     return '$hour12:$minute $ampm';
   }
+
   // Helper to check if any other part is active or paused
   bool _anyOtherActiveOrPaused(String partId) {
     return _partTimers.entries.any((e) {
       final id = e.key;
       final paused = _partPaused[id] == true;
-      final started = _partTimers[id] != null && _partTimers[id] != Duration.zero;
-      final completed = assignedParts.firstWhere((p) => p['id'] == id, orElse: () => {})['part_completed_at'] != null;
-      return ((started && !paused && !completed) || (started && paused && !completed)) && id != partId;
+      final started =
+          _partTimers[id] != null && _partTimers[id] != Duration.zero;
+      final completed =
+          assignedParts.firstWhere(
+            (p) => p['id'] == id,
+            orElse: () => {},
+          )['part_completed_at'] !=
+          null;
+      return ((started && !paused && !completed) ||
+              (started && paused && !completed)) &&
+          id != partId;
     });
   }
+
   void _resumeTimer(String partId) {
     _partPaused[partId] = false;
     _partLastTick[partId] = DateTime.now();
     setState(() {});
     _tick(partId);
   }
+
   // Timer state for each part
   Map<String, Duration> _partTimers = {};
   Map<String, bool> _partPaused = {};
@@ -138,13 +403,25 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     bool anyActiveOrPaused = _partTimers.entries.any((e) {
       final id = e.key;
       final paused = _partPaused[id] == true;
-      final started = _partTimers[id] != null && _partTimers[id] != Duration.zero;
-      final completed = assignedParts.firstWhere((p) => p['id'] == id, orElse: () => {})['part_completed_at'] != null;
-      return ((started && !paused && !completed) || (started && paused && !completed)) && id != partId;
+      final started =
+          _partTimers[id] != null && _partTimers[id] != Duration.zero;
+      final completed =
+          assignedParts.firstWhere(
+            (p) => p['id'] == id,
+            orElse: () => {},
+          )['part_completed_at'] !=
+          null;
+      return ((started && !paused && !completed) ||
+              (started && paused && !completed)) &&
+          id != partId;
     });
     if (anyActiveOrPaused) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot start another time track while another is active or paused.')),
+        SnackBar(
+          content: Text(
+            'Cannot start another time track while another is active or paused.',
+          ),
+        ),
       );
       return;
     }
@@ -183,9 +460,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     // Save completion time to backend
     final provider = context.read<WorkOrdersProvider>();
     final now = DateTime.now().toIso8601String();
-    await provider.updateWorkOrderPart(partId, {
-      'part_completed_at': now,
-    });
+    await provider.updateWorkOrderPart(partId, {'part_completed_at': now});
     await _loadAssignedParts();
     await _updateTotalTimeToWorkOrder();
   }
@@ -197,6 +472,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     final s = twoDigits(d.inSeconds.remainder(60));
     return "$h:$m:$s";
   }
+
   Future<void> _startPart(Map<String, dynamic> part) async {
     final provider = context.read<WorkOrdersProvider>();
     final now = DateTime.now().toUtc().toIso8601String();
@@ -227,11 +503,11 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     // TODO: Implement logic to set part_completed_at in backend
     print('Complete part: \'${part['id']}\'');
   }
+
   late String currentStatusDisplay;
   bool isUpdating = false;
   List<Map<String, dynamic>> assignedParts = [];
   bool isLoadingParts = false;
-
 
   // Helpers to normalize status text between UI and DB
   String _toDisplayStatus(String raw) {
@@ -276,6 +552,37 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   Future<void> updateJobStatus(String newStatus) async {
+    // Prevent status changes if already signed off
+    if (currentStatusDisplay == 'Signed Off') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot change status of a signed-off work order.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Job must be complete first before signed off
+    if (newStatus == 'Signed Off') {
+      if (currentStatusDisplay != 'Completed') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Work order must be completed before it can be signed off.',
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      _showSignOffDialog();
+      return;
+    }
+
     setState(() {
       isUpdating = true;
     });
@@ -299,11 +606,15 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         });
         if (mounted) {
           final providerError = context.read<WorkOrdersProvider>().error;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Failed to update status${providerError != null ? ": $providerError" : ''}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to update status${providerError != null ? ": $providerError" : ''}',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
         return;
       }
@@ -314,22 +625,21 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             content: Text('Job status updated to $newStatus'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
-          )
+          ),
         );
       }
-    }
-    catch (error) {
+    } catch (error) {
       setState(() {
         isUpdating = false;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update status: ${error.toString()}'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            )
+          SnackBar(
+            content: Text('Failed to update status: ${error.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     }
@@ -342,7 +652,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       });
 
       final provider = context.read<WorkOrdersProvider>();
-      final parts = await provider.getAssignedPartsForWorkOrder(widget.workOrder);
+      final parts = await provider.getAssignedPartsForWorkOrder(
+        widget.workOrder,
+      );
 
       if (parts != null) {
         setState(() {
@@ -384,7 +696,11 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+          Icon(
+            icon,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -400,7 +716,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     );
   }
 
-  Widget _buildStatusButton(String text, Color color, bool isSelected, VoidCallback onTap) {
+  Widget _buildStatusButton(
+    String text,
+    Color color,
+    bool isSelected,
+    VoidCallback? onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -453,7 +774,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       if (startedAt != null && completedAt != null) {
         final start = DateTime.parse(startedAt);
         final end = DateTime.parse(completedAt);
-        final diff = end.difference(start) - Duration(hours: 8); // Subtract 8 hours
+        final diff =
+            end.difference(start) - Duration(hours: 8); // Subtract 8 hours
         if (!diff.isNegative) total += diff;
       }
     }
@@ -471,7 +793,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -518,7 +843,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(16),
@@ -547,37 +875,55 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   Text(
                     widget.description,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
-                    const SizedBox(height: 12),
-                  Text('Internal Notes:', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
-                    const SizedBox(height: 4),
-                    TextField(
-                      controller: _notesController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'Add notes for this work order...',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Internal Notes:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _notesController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Add notes for this work order...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          icon: Icon(Icons.save),
-                          label: Text(_isSavingNotes ? 'Saving...' : 'Save Notes'),
-                          onPressed: _isSavingNotes ? null : _updateNotes,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.save),
+                        label: Text(
+                          _isSavingNotes ? 'Saving...' : 'Save Notes',
+                        ),
+                        onPressed: _isSavingNotes ? null : _updateNotes,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -610,7 +956,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(Icons.person, widget.customerName.isNotEmpty ? widget.customerName : widget.assignedTo),
+                  _buildInfoRow(
+                    Icons.person,
+                    widget.customerName.isNotEmpty
+                        ? widget.customerName
+                        : widget.assignedTo,
+                  ),
                   if (widget.customerEmail.isNotEmpty)
                     _buildInfoRow(Icons.email, widget.customerEmail),
                   if (widget.customerPhone.isNotEmpty)
@@ -637,8 +988,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildInfoRow(Icons.directions_car, widget.vehicle),
-                        _buildInfoRow(Icons.confirmation_number, 'VIN: ${widget.vehicleVin.isNotEmpty ? widget.vehicleVin : 'N/A'}'),
-                        _buildInfoRow(Icons.credit_card, 'License Plate: ${widget.licensePlate}'),
+                        _buildInfoRow(
+                          Icons.confirmation_number,
+                          'VIN: ${widget.vehicleVin.isNotEmpty ? widget.vehicleVin : 'N/A'}',
+                        ),
+                        _buildInfoRow(
+                          Icons.credit_card,
+                          'License Plate: ${widget.licensePlate}',
+                        ),
                       ],
                     ),
                   ),
@@ -676,44 +1033,122 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   const SizedBox(height: 16),
 
                   if (isUpdating)
-                    Center (
+                    Center(
                       child: Column(
                         children: [
                           CircularProgressIndicator(),
-                          SizedBox(height: 8,),
-                          Text('Updating status...', style: TextStyle(color: Colors.grey),)
+                          SizedBox(height: 8),
+                          Text(
+                            'Updating status...',
+                            style: TextStyle(color: Colors.grey),
+                          ),
                         ],
                       ),
                     )
                   else
-                  Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatusButton('Pending', Colors.orange, currentStatusDisplay == 'Pending', () => updateJobStatus('Pending'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildStatusButton('Accepted', Colors.blue, currentStatusDisplay == 'Accepted', () => updateJobStatus('Accepted'))),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildStatusButton('In Progress', Colors.green, currentStatusDisplay == 'In Progress', () => updateJobStatus('In Progress'))),
-                          const SizedBox(width: 8)
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child:
-                          Row(
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatusButton(
+                                'Pending',
+                                Colors.orange,
+                                currentStatusDisplay == 'Pending',
+                                () => updateJobStatus('Pending'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatusButton(
+                                'Accepted',
+                                Colors.blue,
+                                currentStatusDisplay == 'Accepted',
+                                () => updateJobStatus('Accepted'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatusButton(
+                                'In Progress',
+                                Colors.green,
+                                currentStatusDisplay == 'In Progress',
+                                () => updateJobStatus('In Progress'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Row(
                             children: [
-                              Expanded(child: _buildStatusButton('On Hold', Colors.red, currentStatusDisplay == 'On Hold', () => updateJobStatus('On Hold'))),
+                              Expanded(
+                                child: _buildStatusButton(
+                                  'On Hold',
+                                  Colors.red,
+                                  currentStatusDisplay == 'On Hold',
+                                  () => updateJobStatus('On Hold'),
+                                ),
+                              ),
                               const SizedBox(width: 8),
-                              Expanded(child: _buildStatusButton('Completed', Colors.purple, currentStatusDisplay == 'Completed', () => updateJobStatus('Completed'))),
+                              Expanded(
+                                child: _buildStatusButton(
+                                  'Completed',
+                                  Colors.purple,
+                                  currentStatusDisplay == 'Completed',
+                                  () => updateJobStatus('Completed'),
+                                ),
+                              ),
                               const SizedBox(width: 8),
-                              Expanded(child: _buildStatusButton('Signed Off', Colors.grey, currentStatusDisplay == 'Signed Off', () => updateJobStatus('Signed Off'))),
-                              const SizedBox(width: 8)
+                              Expanded(
+                                child: _buildStatusButton(
+                                  'Signed Off',
+                                  Colors.grey,
+                                  currentStatusDisplay == 'Signed Off',
+                                  currentStatusDisplay == 'Completed'
+                                      ? () => updateJobStatus('Signed Off')
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                             ],
                           ),
-                      ),
-                    ],
-                  ),
+                        ),
+                        if (currentStatusDisplay == 'Completed') ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.blue.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue[700],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Ready for digital sign-off, click "Signed Off" to begin the signature process.',
+                                    style: TextStyle(
+                                      color: Colors.blue[700],
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -748,8 +1183,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   const SizedBox(height: 16),
 
                   if (isLoadingParts)
-                    Center(child: CircularProgressIndicator(),)
-                  else if (assignedParts.where((part) => part['part_completed_at'] == null).isEmpty)
+                    Center(child: CircularProgressIndicator())
+                  else if (assignedParts
+                      .where((part) => part['part_completed_at'] == null)
+                      .isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
@@ -764,162 +1201,236 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     )
                   else ...[
                     // Unfinished assigned parts
-                    ...assignedParts.where((part) => part['part_completed_at'] == null).map((part) {
-                      final partId = part['id'];
-                      final partName = part['Parts'] != null ? part['Parts']['name'] : part['name'] ?? 'N/A';
-                      final partCategory = part['Parts'] != null ? part['Parts']['category'] : part['category'] ?? 'N/A';
-                      final partPrice = part['Parts'] != null ? part['Parts']['unit_price'] : part['unit_price'] ?? 0;
-                      final quantity = part['quantity'] ?? 0;
-                      final totalPrice = part['total_price'] ?? (partPrice * quantity);
-                      final notes = part['notes'] ?? '';
-                      final startedAt = part['part_started_at'];
-                      final completedAt = part['part_completed_at'];
-                      final isStarted = startedAt != null;
-                      final isCompleted = completedAt != null;
-                      final isPaused = _partPaused[partId] == true;
-                      final timerValue = _partTimers[partId] ?? Duration.zero;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 1,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(partName ?? 'N/A', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
-                                      const SizedBox(height: 4),
-                                      Text('Category: $partCategory', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
-                                      if (notes.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text('Notes: $notes', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12, fontStyle: FontStyle.italic)),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 1,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text('Qty: $quantity', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
-                                      const SizedBox(height: 4),
-                                      Text('Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}', style: TextStyle(color: Colors.green[700], fontSize: 12)),
-                                      const SizedBox(height: 4),
-                                      Text('Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}', style: TextStyle(color: Colors.green[900], fontSize: 13, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
+                    ...assignedParts
+                        .where((part) => part['part_completed_at'] == null)
+                        .map((part) {
+                          final partId = part['id'];
+                          final partName = part['Parts'] != null
+                              ? part['Parts']['name']
+                              : part['name'] ?? 'N/A';
+                          final partCategory = part['Parts'] != null
+                              ? part['Parts']['category']
+                              : part['category'] ?? 'N/A';
+                          final partPrice = part['Parts'] != null
+                              ? part['Parts']['unit_price']
+                              : part['unit_price'] ?? 0;
+                          final quantity = part['quantity'] ?? 0;
+                          final totalPrice =
+                              part['total_price'] ?? (partPrice * quantity);
+                          final notes = part['notes'] ?? '';
+                          final startedAt = part['part_started_at'];
+                          final completedAt = part['part_completed_at'];
+                          final isStarted = startedAt != null;
+                          final isCompleted = completedAt != null;
+                          final isPaused = _partPaused[partId] == true;
+                          final timerValue =
+                              _partTimers[partId] ?? Duration.zero;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 1,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            if (isStarted && !isCompleted && !isPaused) ...[
-                              Center(
-                                child: Text(
-                                  _formatDuration(timerValue),
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF22C55E),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    ),
-                                    icon: const Icon(Icons.pause),
-                                    label: const Text('Pause'),
-                                    onPressed: () {
-                                      _pauseTimer(partId);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ]
-                            else if (isStarted && !isCompleted && isPaused) ...[
-                              Center(
-                                child: Text(
-                                  _formatDuration(timerValue),
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF22C55E),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (!_anyOtherActiveOrPaused(partId))
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(0xFF22C55E),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            partName ?? 'N/A',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Category: $partCategory',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          if (notes.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Notes: $notes',
+                                              style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withOpacity(0.7),
+                                                fontSize: 12,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                      icon: const Icon(Icons.play_arrow),
-                                      label: const Text('Resume'),
-                                      onPressed: () {
-                                        _resumeTimer(partId);
-                                      },
                                     ),
-                                  if (!_anyOtherActiveOrPaused(partId))
-                                    const SizedBox(width: 16),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'Qty: $quantity',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              color: Colors.green[700],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              color: Colors.green[900],
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    icon: const Icon(Icons.check),
-                                    label: const Text('Complete'),
-                                    onPressed: () {
-                                      _completeTimer(partId, part);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ]
-                            else if (!isStarted) ...[
-                              if (!_anyOtherActiveOrPaused(partId))
-                                Center(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      _startPart(part);
-                                      _startTimer(partId);
-                                    },
-                                    child: const Text('Start'),
-                                  ),
+                                  ],
                                 ),
-                            ],
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                                const SizedBox(height: 12),
+                                if (isStarted && !isCompleted && !isPaused) ...[
+                                  Center(
+                                    child: Text(
+                                      _formatDuration(timerValue),
+                                      style: const TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF22C55E),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.pause),
+                                        label: const Text('Pause'),
+                                        onPressed: () {
+                                          _pauseTimer(partId);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ] else if (isStarted &&
+                                    !isCompleted &&
+                                    isPaused) ...[
+                                  Center(
+                                    child: Text(
+                                      _formatDuration(timerValue),
+                                      style: const TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF22C55E),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (!_anyOtherActiveOrPaused(partId))
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Color(0xFF22C55E),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 24,
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          icon: const Icon(Icons.play_arrow),
+                                          label: const Text('Resume'),
+                                          onPressed: () {
+                                            _resumeTimer(partId);
+                                          },
+                                        ),
+                                      if (!_anyOtherActiveOrPaused(partId))
+                                        const SizedBox(width: 16),
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.check),
+                                        label: const Text('Complete'),
+                                        onPressed: () {
+                                          _completeTimer(partId, part);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ] else if (!isStarted) ...[
+                                  if (!_anyOtherActiveOrPaused(partId))
+                                    Center(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          _startPart(part);
+                                          _startTimer(partId);
+                                        },
+                                        child: const Text('Start'),
+                                      ),
+                                    ),
+                                ],
+                              ],
+                            ),
+                          );
+                        })
+                        .toList(),
                   ],
                 ],
               ),
@@ -953,7 +1464,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (assignedParts.where((part) => part['part_completed_at'] != null).isEmpty)
+                  if (assignedParts
+                      .where((part) => part['part_completed_at'] != null)
+                      .isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
@@ -970,13 +1483,20 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     // Calculate total sum price
                     Builder(
                       builder: (context) {
-                        final finishedParts = assignedParts.where((part) => part['part_completed_at'] != null);
+                        final finishedParts = assignedParts.where(
+                          (part) => part['part_completed_at'] != null,
+                        );
                         double totalSum = 0;
                         for (final part in finishedParts) {
-                          final partPrice = part['Parts'] != null ? part['Parts']['unit_price'] : part['unit_price'] ?? 0;
+                          final partPrice = part['Parts'] != null
+                              ? part['Parts']['unit_price']
+                              : part['unit_price'] ?? 0;
                           final quantity = part['quantity'] ?? 0;
-                          final totalPrice = part['total_price'] ?? (partPrice * quantity);
-                          totalSum += (totalPrice is num ? totalPrice.toDouble() : 0);
+                          final totalPrice =
+                              part['total_price'] ?? (partPrice * quantity);
+                          totalSum += (totalPrice is num
+                              ? totalPrice.toDouble()
+                              : 0);
                         }
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -991,71 +1511,137 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                         );
                       },
                     ),
-                    ...assignedParts.where((part) => part['part_completed_at'] != null).map((part) {
-                      final partName = part['Parts'] != null ? part['Parts']['name'] : part['name'] ?? 'N/A';
-                      final partCategory = part['Parts'] != null ? part['Parts']['category'] : part['category'] ?? 'N/A';
-                      final partPrice = part['Parts'] != null ? part['Parts']['unit_price'] : part['unit_price'] ?? 0;
-                      final quantity = part['quantity'] ?? 0;
-                      final totalPrice = part['total_price'] ?? (partPrice * quantity);
-                      final notes = part['notes'] ?? '';
-                      final completedAt = part['part_completed_at'];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                    ...assignedParts
+                        .where((part) => part['part_completed_at'] != null)
+                        .map((part) {
+                          final partName = part['Parts'] != null
+                              ? part['Parts']['name']
+                              : part['name'] ?? 'N/A';
+                          final partCategory = part['Parts'] != null
+                              ? part['Parts']['category']
+                              : part['category'] ?? 'N/A';
+                          final partPrice = part['Parts'] != null
+                              ? part['Parts']['unit_price']
+                              : part['unit_price'] ?? 0;
+                          final quantity = part['quantity'] ?? 0;
+                          final totalPrice =
+                              part['total_price'] ?? (partPrice * quantity);
+                          final notes = part['notes'] ?? '';
+                          final completedAt = part['part_completed_at'];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(partName ?? 'N/A', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
-                                  const SizedBox(height: 4),
-                                  Text('Category: $partCategory', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
-                                  if (notes.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text('Notes: $notes', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12, fontStyle: FontStyle.italic)),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('Qty: $quantity', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
-                                  const SizedBox(height: 4),
-                                  Text('Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}', style: TextStyle(color: Colors.green[700], fontSize: 12)),
-                                  const SizedBox(height: 4),
-                                  Text('Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}', style: TextStyle(color: Colors.green[900], fontSize: 13, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Completed: ' + (completedAt != null
-                                      ? _formatCompletedDate(completedAt)
-                                      : ''),
-                                    style: TextStyle(color: Colors.green[900], fontSize: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        partName ?? 'N/A',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Category: $partCategory',
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.7),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      if (notes.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Notes: $notes',
+                                          style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.7),
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                Expanded(
+                                  flex: 1,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Qty: $quantity',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: Colors.green[700],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: Colors.green[900],
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Completed: ' +
+                                            (completedAt != null
+                                                ? _formatCompletedDate(
+                                                    completedAt,
+                                                  )
+                                                : ''),
+                                        style: TextStyle(
+                                          color: Colors.green[900],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        })
+                        .toList(),
                   ],
                 ], // <-- Add this missing closing bracket for the children list
               ),
@@ -1082,10 +1668,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 children: [
                   const Text(
                     'Time Summary',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   if (assignedParts.isEmpty)
@@ -1103,14 +1686,18 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     )
                   else ...[
                     ...assignedParts.map((part) {
-                      final partName = part['Parts'] != null ? part['Parts']['name'] : part['name'] ?? 'N/A';
+                      final partName = part['Parts'] != null
+                          ? part['Parts']['name']
+                          : part['name'] ?? 'N/A';
                       final completedAt = part['part_completed_at'];
                       final startedAt = part['part_started_at'];
                       Duration duration = Duration.zero;
                       if (startedAt != null && completedAt != null) {
                         final start = DateTime.parse(startedAt);
                         final end = DateTime.parse(completedAt);
-                        duration = end.difference(start) - Duration(hours: 8); // Subtract 8 hours
+                        duration =
+                            end.difference(start) -
+                            Duration(hours: 8); // Subtract 8 hours
                       }
                       if (duration.isNegative) duration = Duration.zero;
                       final hours = duration.inHours;
@@ -1125,14 +1712,28 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(partName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    if (completedAt != null && startedAt != null)
-                                      Text('${hours}h ${minutes}m ${seconds}s', style: TextStyle(color: Colors.green)),
+                                  Text(
+                                    partName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (completedAt != null && startedAt != null)
+                                    Text(
+                                      '${hours}h ${minutes}m ${seconds}s',
+                                      style: TextStyle(color: Colors.green),
+                                    ),
                                 ],
                               ),
                             ),
                             if (completedAt != null && startedAt != null)
-                                Text('${hours}h ${minutes}m ${seconds}s', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                              Text(
+                                '${hours}h ${minutes}m ${seconds}s',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                           ],
                         ),
                       );
@@ -1140,11 +1741,15 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     const Divider(height: 24, thickness: 2),
                     Row(
                       children: [
-                          const Icon(Icons.access_time, color: Colors.green),
+                        const Icon(Icons.access_time, color: Colors.green),
                         const SizedBox(width: 8),
                         Text(
-                            'Total Time: ' + _getTotalTimeSummary(),
-                            style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
+                          'Total Time: ' + _getTotalTimeSummary(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -1157,5 +1762,4 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       ),
     );
   }
-
 }
