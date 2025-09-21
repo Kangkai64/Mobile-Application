@@ -13,12 +13,20 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   String? _selectedStatus; // null => All Jobs
+  DateTime? _selectedDate;
+  String _dateFilterType = 'all'; // 'all', 'today', 'week', 'custom'
+  
   @override
   Widget build(BuildContext context) {
     final workOrdersProvider = context.watch<WorkOrdersProvider>();
     final List<WorkOrders> allOrders = workOrdersProvider.workOrders ?? [];
     final List<WorkOrders> orders =
-        workOrdersProvider.filterOrders(status: _selectedStatus, filterByStaff: true);
+        workOrdersProvider.filterOrders(
+          status: _selectedStatus, 
+          filterByStaff: true,
+          selectedDate: _selectedDate,
+          dateFilterType: _dateFilterType,
+        );
 
     int countByStatus(String status) => orders
         .where((o) => (o.status).toUpperCase() == status.toUpperCase())
@@ -47,7 +55,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
-            child: Icon(Icons.calendar_today, color: Colors.green),
+            child: GestureDetector(
+              onTap: _showDateFilterOptions,
+              child: Icon(Icons.calendar_today, color: Colors.green),
+            ),
           ),
         ],
       ),
@@ -66,6 +77,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 12),
+
+            // Date filter indicator
+            if (_dateFilterType != 'all')
+              Container(
+                margin: const EdgeInsets.only(bottom: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.filter_list, color: Colors.green, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getDateFilterText(),
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _dateFilterType = 'all';
+                          _selectedDate = null;
+                        });
+                      },
+                      child: Icon(Icons.close, color: Colors.green[700], size: 16),
+                    ),
+                  ],
+                ),
+              ),
 
             // Job summary cards
             Row(
@@ -487,6 +535,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return 'SIGNED OFF';
       default:
         return status.toUpperCase();
+    }
+  }
+
+  void _showDateFilterOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Filter by Date',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildDateFilterOption('All Jobs', 'all', Icons.all_inclusive),
+              _buildDateFilterOption('Today', 'today', Icons.today),
+              _buildDateFilterOption('This Week', 'week', Icons.date_range),
+              _buildDateFilterOption('Custom Date', 'custom', Icons.calendar_month),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDateFilterOption(String title, String value, IconData icon) {
+    bool isSelected = _dateFilterType == value;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? Colors.green : Colors.grey[600]),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? Colors.green : Theme.of(context).colorScheme.onSurface,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onTap: () {
+        Navigator.pop(context);
+        if (value == 'custom') {
+          _selectCustomDate();
+        } else {
+          setState(() {
+            _dateFilterType = value;
+            _selectedDate = null;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _selectCustomDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _dateFilterType = 'custom';
+      });
+    }
+  }
+
+  String _getDateFilterText() {
+    switch (_dateFilterType) {
+      case 'today':
+        return 'Today';
+      case 'week':
+        return 'This Week';
+      case 'custom':
+        if (_selectedDate != null) {
+          return '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}';
+        }
+        return 'Custom Date';
+      default:
+        return 'All Jobs';
     }
   }
 }

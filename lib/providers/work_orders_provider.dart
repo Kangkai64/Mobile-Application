@@ -37,7 +37,7 @@ class WorkOrdersProvider extends ChangeNotifier {
   String? get currentStaffId => _currentStaffId;
 
   //getters
-  List<WorkOrders> filterOrders({String? status, String? priority, bool filterByStaff = true}) {
+  List<WorkOrders> filterOrders({String? status, String? priority, bool filterByStaff = true, DateTime? selectedDate, String? dateFilterType}) {
     List<WorkOrders> filteredOrders = _workOrders ?? [];
     
     // Filter by current staff if requested
@@ -48,6 +48,34 @@ class WorkOrdersProvider extends ChangeNotifier {
       if (_currentStaffId != null) {
         filteredOrders = filteredOrders.where((o) => o.assignedStaffId == _currentStaffId).toList();
       }
+    }
+    
+    // Apply date filters
+    if (dateFilterType != null && dateFilterType != 'all') {
+      DateTime now = DateTime.now();
+      DateTime today = DateTime(now.year, now.month, now.day);
+      
+      filteredOrders = filteredOrders.where((o) {
+        DateTime orderDate = DateTime(o.scheduledDate.year, o.scheduledDate.month, o.scheduledDate.day);
+        
+        switch (dateFilterType) {
+          case 'today':
+            return orderDate.isAtSameMomentAs(today);
+          case 'week':
+            DateTime weekStart = today.subtract(Duration(days: today.weekday - 1));
+            DateTime weekEnd = weekStart.add(Duration(days: 6));
+            return orderDate.isAfter(weekStart.subtract(Duration(days: 1))) && 
+                   orderDate.isBefore(weekEnd.add(Duration(days: 1)));
+          case 'custom':
+            if (selectedDate != null) {
+              DateTime customDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+              return orderDate.isAtSameMomentAs(customDate);
+            }
+            return true;
+          default:
+            return true;
+        }
+      }).toList();
     }
     
     // Apply status and priority filters
