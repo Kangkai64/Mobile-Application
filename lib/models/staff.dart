@@ -47,7 +47,7 @@ class Staff {
       salary: map['salary']?.toDouble(),
       staffStatus: ((map['staff_status'] ?? 'Active').toString()),
       notes: map['notes'],
-      authUserId: map['auth_user_id'],
+      authUserId: map['auth_user_id'] ?? '',
       specializations: (map['specializations'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       profileImageUrl: map['profile_image_url'],
     );

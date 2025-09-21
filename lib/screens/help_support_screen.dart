@@ -121,7 +121,7 @@ class HelpSupportScreen extends StatelessWidget {
             // Tagline / description
             Text(
               "Elevate your business with Greenstem, delivering top-tier web, mobile, and desktop software solutions, including Accounting and Inventory control. Committed to customer satisfaction and continual innovation, we're your dedicated partner for success.",
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.justify,
               style: TextStyle(
                 color: onBg.withOpacity(0.8),
                 fontSize: 14,
@@ -150,7 +150,7 @@ class HelpSupportScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.call),
                     title: const Text('Technical Support'),
-                    subtitle: const Text('(6)03 6263 3933'),
+                    subtitle: const Text('(6)03-6263-3933'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => _callSupport(context),
                   ),

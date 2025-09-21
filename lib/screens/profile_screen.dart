@@ -337,80 +337,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Statistics cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    Icons.emoji_events,
-                    _jobsCompleted.toString(),
-                    'Jobs Completed',
-                    Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    Icons.access_time,
-                    _totalHours.toStringAsFixed(1),
-                    'Total Hours',
-                    Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    Icons.build,
-                    '4.8',
-                    'Avg Rating',
-                    Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Specializations card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Statistics cards - only show for non-admin users
+            if ((_staff?.position ?? '').toLowerCase() != 'admin') ...[
+              Row(
                 children: [
-                  Text(
-                    'Specializations',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+                  Expanded(
+                    child: _buildStatCard(
+                      Icons.emoji_events,
+                      _jobsCompleted.toString(),
+                      'Jobs Completed',
+                      Colors.green,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if ((_staff?.specializations ?? []).isEmpty)
-                        _buildSpecializationChip('No specializations set')
-                      else
-                        ..._staff!.specializations.map(_buildSpecializationChip),
-                    ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
+                      Icons.access_time,
+                      _totalHours.toStringAsFixed(1),
+                      'Total Hours',
+                      Colors.blue,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+
+              // Specializations card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Specializations',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if ((_staff?.specializations ?? []).isEmpty)
+                          _buildSpecializationChip('No specializations set')
+                        else
+                          ..._staff!.specializations.map(_buildSpecializationChip),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Settings card
             Container(
@@ -463,19 +456,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
-                  if ((_staff?.position ?? '').toLowerCase() == 'admin')
-                    _buildSettingsItem(
-                      Icons.people,
-                      'Staff Management',
-                      () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const StaffManagementScreen(),
-                          ),
-                        );
-                      },
-                    ),
                   _buildSettingsItem(
                     Icons.help_outline,
                     'Help & Support',

@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _requestAccess() async {
+  Future<void> _requestAccount() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isSignUp = true; _error = null; });
     try {
@@ -138,8 +138,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: _isSignUp ? null : _requestAccess,
-                                  child: _isSignUp ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Request Access'),
+                                  onPressed: _isSignUp ? null : _requestAccount,
+                                  child: _isSignUp ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Get Account'),
                                 ),
                               ),
                             ],

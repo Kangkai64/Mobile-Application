@@ -11,6 +11,7 @@
     import 'package:image/image.dart' as img;
     import '../services/image_service.dart';
     import 'package:image_picker/image_picker.dart';
+    import '../utils/currency_formatter.dart';
 
   class JobDetailsScreen extends StatefulWidget {
     final String workOrder;
@@ -1703,21 +1704,31 @@
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              'Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}',
-                                              style: TextStyle(
-                                                color: Colors.green[700],
-                                                fontSize: 12,
-                                              ),
+                                            FutureBuilder<String>(
+                                              future: CurrencyFormatter.formatWithAutoConversion(partPrice ?? 0),
+                                              builder: (context, snapshot) {
+                                                return Text(
+                                                  'Unit: ${snapshot.data ?? '\$${(partPrice ?? 0).toStringAsFixed(2)}'}',
+                                                  style: TextStyle(
+                                                    color: Colors.green[700],
+                                                    fontSize: 12,
+                                                  ),
+                                                );
+                                              },
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              'Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}',
-                                              style: TextStyle(
-                                                color: Colors.green[900],
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                            FutureBuilder<String>(
+                                              future: CurrencyFormatter.formatWithAutoConversion(totalPrice ?? 0),
+                                              builder: (context, snapshot) {
+                                                return Text(
+                                                  'Total: ${snapshot.data ?? '\$${(totalPrice ?? 0).toStringAsFixed(2)}'}',
+                                                  style: TextStyle(
+                                                    color: Colors.green[900],
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ],
                                         ),
@@ -1895,13 +1906,18 @@
                           }
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: Text(
-                              'Total Price of Finished Parts: \$${totalSum.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: Colors.green[900],
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: FutureBuilder<String>(
+                              future: CurrencyFormatter.formatWithAutoConversion(totalSum),
+                              builder: (context, snapshot) {
+                                return Text(
+                                  'Total Price of Finished Parts: ${snapshot.data ?? '\$${totalSum.toStringAsFixed(2)}'}',
+                                  style: TextStyle(
+                                    color: Colors.green[900],
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
@@ -2000,21 +2016,31 @@
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'Unit: \$${(partPrice ?? 0).toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            color: Colors.green[700],
-                                            fontSize: 12,
-                                          ),
+                                        FutureBuilder<String>(
+                                          future: CurrencyFormatter.formatWithAutoConversion(partPrice ?? 0),
+                                          builder: (context, snapshot) {
+                                            return Text(
+                                              'Unit: ${snapshot.data ?? '\$${(partPrice ?? 0).toStringAsFixed(2)}'}',
+                                              style: TextStyle(
+                                                color: Colors.green[700],
+                                                fontSize: 12,
+                                              ),
+                                            );
+                                          },
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'Total: \$${(totalPrice ?? 0).toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            color: Colors.green[900],
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        FutureBuilder<String>(
+                                          future: CurrencyFormatter.formatWithAutoConversion(totalPrice ?? 0),
+                                          builder: (context, snapshot) {
+                                            return Text(
+                                              'Total: ${snapshot.data ?? '\$${(totalPrice ?? 0).toStringAsFixed(2)}'}',
+                                              style: TextStyle(
+                                                color: Colors.green[900],
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            );
+                                          },
                                         ),
                                         const SizedBox(height: 4),
                                         Text(

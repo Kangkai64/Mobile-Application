@@ -137,6 +137,43 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     );
   }
 
+  Widget _buildStaffAvatar(Staff staff) {
+    if (staff.profileImageUrl != null && staff.profileImageUrl!.isNotEmpty) {
+      return CircleAvatar(
+        backgroundImage: NetworkImage(staff.profileImageUrl!),
+        onBackgroundImageError: (exception, stackTrace) {
+          // If image fails to load, fall back to default avatar
+        },
+        child: null,
+      );
+    }
+    
+    // Default avatar with gradient background
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            Colors.blue.shade200,
+            Colors.blue.shade400,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: CircleAvatar(
+        backgroundColor: Colors.transparent,
+        child: Text(
+          staff.name.isNotEmpty ? staff.name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _resetPassword(Staff staff) async {
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
@@ -179,27 +216,6 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     );
   }
 
-  Future<void> _reject(Staff staff) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Staff'),
-        content: Text('Reject ${staff.email}? This revokes any access.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reject')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await _staffService.rejectStaff(staff.id);
-    _loadStaff();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Staff rejected')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -236,13 +252,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.green,
-                          child: Text(
-                            staff.name[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
+                        leading: _buildStaffAvatar(staff),
                         title: Text(staff.name),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,16 +294,6 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                               ),
                             ),
                             PopupMenuItem(
-                              value: 'reject',
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.block, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Reject', style: TextStyle(color: Colors.red)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
                               value: 'delete',
                               child: const Row(
                                 children: [
@@ -311,8 +311,6 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                               _resetPassword(staff);
                             } else if (value == 'deactivate') {
                               _deactivate(staff);
-                            } else if (value == 'reject') {
-                              _reject(staff);
                             } else if (value == 'delete') {
                               _deleteStaff(staff);
                             }
@@ -547,7 +545,6 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // New: Staff Status dropdown
               DropdownButtonFormField<String>(
                 value: _staffStatus,
                 decoration: const InputDecoration(labelText: 'Status *'),
@@ -555,7 +552,6 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
                   DropdownMenuItem(value: 'Active', child: Text('Active')),
                   DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
                   DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                  DropdownMenuItem(value: 'Rejected', child: Text('Rejected')),
                 ],
                 onChanged: (v) => setState(() => _staffStatus = v ?? 'Active'),
               ),

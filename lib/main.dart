@@ -11,6 +11,9 @@ import 'providers/work_orders_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/supabase_service.dart';
 import 'services/staff_service.dart';
+import 'models/staff.dart';
+import 'screens/staff_management_screen.dart';
+import 'screens/admin_work_orders_screen.dart';
 import 'config/supabase_config.dart';
 
 Future<void> main() async {
@@ -172,10 +175,47 @@ class _RootRouterState extends State<RootRouter> {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  Staff? _currentStaff;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentStaff();
+  }
+
+  Future<void> _loadCurrentStaff() async {
+    try {
+      final email = Supabase.instance.client.auth.currentUser?.email;
+      if (email != null) {
+        final staff = await StaffService().fetchByEmail(email);
+        setState(() {
+          _currentStaff = staff;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final isAdmin = _currentStaff?.position.toLowerCase() == 'admin';
+    
+    final List<Widget> screens = isAdmin ? [
+      const AdminWorkOrdersScreen(),
+      const StaffManagementScreen(),
+      const ProfileScreen(),
+    ] : [
       const DashboardScreen(),
       const ActiveJobsScreen(),
       const CameraScreen(),
@@ -193,7 +233,21 @@ class _MainScreenState extends State<MainScreen> {
         },
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        items: const [
+        type: BottomNavigationBarType.fixed,
+        items: isAdmin ? const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.work),
+            label: 'Work Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Staff',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ] : const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
             label: 'Dashboard',

@@ -145,13 +145,6 @@ class StaffService {
     final staff = await fetchById(id);
     if (staff == null) return false;
 
-    // If there is an auth user, delete it to revoke access
-    if (staff.authUserId != null) {
-      try {
-        await _supabaseService.serviceClient.auth.admin.deleteUser(staff.authUserId!);
-      } catch (_) {}
-    }
-
     await _supabaseService.executeQuery(
       'rejectStaff',
       (client) => client
