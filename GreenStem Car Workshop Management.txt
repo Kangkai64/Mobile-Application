@@ -250,7 +250,7 @@ create table public."WorkOrders" (
   total_time integer null,
   signed_off_at timestamp with time zone null,
   customer_signature text null,
-  image_url text null,
+  image_url jsonb null,
   constraint workorders_pkey primary key (id),
   constraint workorders_assigned_staff_id_fkey foreign KEY (assigned_staff_id) references "Staff" (id),
   constraint workorders_customer_id_fkey foreign KEY (customer_id) references "Customers" (id),

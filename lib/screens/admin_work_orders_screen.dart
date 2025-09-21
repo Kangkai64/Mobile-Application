@@ -174,6 +174,22 @@ class _AdminWorkOrdersScreenState extends State<AdminWorkOrdersScreen> {
                       _buildFilterChip('Completed', _selectedStatus == 'Completed', () {
                         setState(() => _selectedStatus = 'Completed');
                       }),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Signed Off', _selectedStatus == 'Signed Off', () {
+                        setState(() => _selectedStatus = 'Signed Off');
+                      }),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Cancelled', _selectedStatus == 'Cancelled', () {
+                        setState(() => _selectedStatus = 'Cancelled');
+                      }),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('On Hold', _selectedStatus == 'On Hold', () {
+                        setState(() => _selectedStatus = 'On Hold');
+                      }),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Accepted', _selectedStatus == 'Accepted', () {
+                        setState(() => _selectedStatus = 'Accepted');
+                      }),
                       const SizedBox(width: 16),
                       _buildPriorityChip('High', _selectedPriority == 'High', () {
                         setState(() => _selectedPriority = _selectedPriority == 'High' ? null : 'High');

@@ -150,22 +150,47 @@ class ImageService {
   /// Delete image from Supabase bucket
   Future<bool> deleteImage(String imageUrl, String _bucketName) async {
     try {
+      print('Attempting to delete image: $imageUrl from bucket: $_bucketName');
+      
       // Extract file path from URL
       final uri = Uri.parse(imageUrl);
       final pathSegments = uri.pathSegments;
-
-      // Find the bucket name and file path
+      
       final bucketIndex = pathSegments.indexOf(_bucketName);
       if (bucketIndex == -1 || bucketIndex >= pathSegments.length - 1) {
-        throw Exception('Invalid image URL');
+        // Try alternative approach - look for the bucket name in the URL path
+        final urlPath = uri.path;
+        final bucketPattern = '/$_bucketName/';
+        final bucketStartIndex = urlPath.indexOf(bucketPattern);
+        
+        if (bucketStartIndex == -1) {
+          print('Bucket name not found in URL path: $urlPath');
+          throw Exception('Bucket name not found in URL: $_bucketName');
+        }
+        
+        final filePath = urlPath.substring(bucketStartIndex + bucketPattern.length);
+        if (filePath.isEmpty) {
+          print('No file path found after bucket name');
+          throw Exception('No file path found after bucket name');
+        }
+
+        print('Deleting file path: $filePath from bucket: $_bucketName');
+        await _supabase.storage
+            .from(_bucketName)
+            .remove([filePath]);
+
+        print('Successfully deleted image from storage');
+        return true;
       }
 
       final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+      print('Deleting file path: $filePath from bucket: $_bucketName');
 
       await _supabase.storage
           .from(_bucketName)
           .remove([filePath]);
 
+      print('Successfully deleted image from storage');
       return true;
     } catch (e) {
       print('Failed to delete image: $e');

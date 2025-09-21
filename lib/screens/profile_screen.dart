@@ -32,7 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint('ProfileScreen initState');
     _loadStaff();
   }
 
@@ -209,7 +208,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    debugPrint('ProfileScreen dispose');
     super.dispose();
   }
 

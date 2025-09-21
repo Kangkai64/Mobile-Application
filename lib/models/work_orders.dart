@@ -23,6 +23,7 @@ class WorkOrders {
   final Customers? customers;
   final int? totalTime;
   final String? customerSignature;
+  final List<String>? imageUrl;
 
   WorkOrders({
     required this.id,
@@ -44,6 +45,7 @@ class WorkOrders {
   required this.customers,
   this.totalTime,
   this.customerSignature,
+  this.imageUrl,
   });
 
   factory WorkOrders.fromMap(Map<String, dynamic> map) {
@@ -83,6 +85,7 @@ class WorkOrders {
       : null,
   totalTime: map['total_time'] is int ? map['total_time'] : (map['total_time'] != null ? int.tryParse(map['total_time'].toString()) : null),
   customerSignature: map['customer_signature'],
+  imageUrl: map['image_url'] is List ? List<String>.from(map['image_url']) : null,
   );
   }
 
@@ -106,6 +109,7 @@ class WorkOrders {
       'internal_notes': internalNotes,
   'total_time': totalTime,
   'customer_signature': customerSignature,
+  'image_url': imageUrl,
     };
   }
 
