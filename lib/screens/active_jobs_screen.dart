@@ -126,6 +126,7 @@ class ActiveJobsScreen extends StatelessWidget {
                             o.licensePlate,
                             o.assignedStaffId,
                             '',
+                            o.customerSignature,
                           ),
                         )),
                 ],
@@ -182,6 +183,7 @@ class ActiveJobsScreen extends StatelessWidget {
                             o.licensePlate,
                             o.assignedStaffId,
                             '',
+                            o.customerSignature,
                           ),
                         )),
                 ],
@@ -204,6 +206,7 @@ class ActiveJobsScreen extends StatelessWidget {
     String licensePlate,
     String assignedTo,
     String timeSpent,
+    String? customerSignature,
   ) {
     Color priorityColor = priority == 'HIGH' ? Colors.red : 
                          priority == 'MEDIUM' ? Colors.orange : Colors.green;
@@ -227,6 +230,7 @@ class ActiveJobsScreen extends StatelessWidget {
               customerPhone: '',
               customerAddress: '',
               vehicleVin: '',
+              customerSignature: customerSignature,
             ),
           ),
         );

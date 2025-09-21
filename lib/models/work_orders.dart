@@ -22,6 +22,7 @@ class WorkOrders {
   final Vehicles? vehicles;
   final Customers? customers;
   final int? totalTime;
+  final String? customerSignature;
 
   WorkOrders({
     required this.id,
@@ -42,6 +43,7 @@ class WorkOrders {
   required this.vehicles,
   required this.customers,
   this.totalTime,
+  this.customerSignature,
   });
 
   factory WorkOrders.fromMap(Map<String, dynamic> map) {
@@ -79,7 +81,8 @@ class WorkOrders {
     customers: map['Customers'] != null
       ? Customers.fromMap(map['Customers'] as Map<String, dynamic>)
       : null,
-    totalTime: map['total_time'] is int ? map['total_time'] : (map['total_time'] != null ? int.tryParse(map['total_time'].toString()) : null),
+  totalTime: map['total_time'] is int ? map['total_time'] : (map['total_time'] != null ? int.tryParse(map['total_time'].toString()) : null),
+  customerSignature: map['customer_signature'],
   );
   }
 
@@ -101,7 +104,8 @@ class WorkOrders {
       'payment_status': paymentStatus,
       'customer_notes': customerNotes,
       'internal_notes': internalNotes,
-      'total_time': totalTime,
+  'total_time': totalTime,
+  'customer_signature': customerSignature,
     };
   }
 

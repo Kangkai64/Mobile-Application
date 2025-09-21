@@ -277,7 +277,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String licensePlate,
     String assignedTo,
     String timeSpent,
-    {String customerName = '', String customerEmail = '', String customerPhone = '', String customerAddress = '', String vehicleVin = ''}
+  {String customerName = '', String customerEmail = '', String customerPhone = '', String customerAddress = '', String vehicleVin = '', String? customerSignature}
   ) {
     Color priorityColor = priority == 'HIGH'
         ? Colors.red
@@ -304,6 +304,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               customerPhone: customerPhone,
               customerAddress: customerAddress,
               vehicleVin: vehicleVin,
+              customerSignature: customerSignature,
             ),
           ),
         );
